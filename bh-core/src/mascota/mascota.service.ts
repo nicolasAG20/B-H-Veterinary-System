@@ -1,7 +1,8 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
-import { Mascota } from './entities/mascota.entity';
+import { Mascota, EstadoMascota } from './entities/mascota.entity';
+import { Cliente } from '../cliente/entities/cliente.entity';
 import { CreateMascotaDto } from './dto/create-mascota.dto';
 import { UpdateMascotaDto } from './dto/update-mascota.dto';
 
@@ -10,16 +11,36 @@ export class MascotaService {
   constructor(
     @InjectRepository(Mascota)
     private readonly mascotaRepository: Repository<Mascota>,
+
+    @InjectRepository(Cliente)
+    private readonly clienteRepository: Repository<Cliente>,
   ) {}
 
   async create(createMascotaDto: CreateMascotaDto) {
-    const { clienteId, ...rest } = createMascotaDto;
+    const { clienteId, estado, ...rest } = createMascotaDto;
+
+    const cliente = await this.clienteRepository.findOne({
+      where: { idCliente: clienteId},
+    });
+
+    if (!cliente){
+      throw new NotFoundException(
+        'Cliente #${clienteId} no encontrado',
+      );
+    }
+
     const mascota = this.mascotaRepository.create({
       ...rest,
-      cliente: { idCliente: clienteId } as any,
+      estado: estado ?? EstadoMascota.ACTIVA,
+      cliente,
     });
+
     await this.mascotaRepository.save(mascota);
-    return { message: 'Mascota creada correctamente', mascota };
+
+    return{
+      message: 'Mascota creada correctamente',
+      mascota,
+    };
   }
 
   async findAll() {
@@ -35,6 +56,23 @@ export class MascotaService {
       throw new NotFoundException(`Mascota #${id} no encontrada`);
     }
     return mascota;
+  }
+
+
+  async findByCliente(clienteId: number){
+    const cliente = await this.clienteRepository.findOne({
+       where: { idCliente: clienteId},
+    })
+
+    if(!cliente){
+      throw new NotFoundException('Cliente #${clienteId} no encontrado');
+    }
+
+    return this.mascotaRepository.find({
+      where: { cliente: { idCliente: clienteId } },
+      relations: ['cliente'],
+    });
+   
   }
 
   async update(id: number, updateMascotaDto: UpdateMascotaDto) {
