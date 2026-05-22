@@ -1,4 +1,4 @@
-import { IsDateString, IsEnum, IsInt, IsNumber, IsPositive, IsString } from 'class-validator';
+import { IsDateString, IsEnum, IsInt, IsNumber, IsOptional, IsPositive, IsString } from 'class-validator';
 import { EstadoMascota } from '../entities/mascota.entity';
 
 export class CreateMascotaDto {
@@ -22,7 +22,8 @@ export class CreateMascotaDto {
   peso: number;
 
   @IsEnum(EstadoMascota)
-  estado: EstadoMascota;
+  @IsOptional()
+  estado?: EstadoMascota;
 
   @IsInt()
   @IsPositive()

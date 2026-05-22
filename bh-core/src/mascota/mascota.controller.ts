@@ -17,6 +17,11 @@ export class MascotaController {
     return this.mascotaService.findAll();
   }
 
+  @Get('cliente/:clienteId')
+  findByCliente(@Param('clienteId') clienteId: string) {
+  return this.mascotaService.findByCliente(+clienteId);
+  }
+
   @Get(':id')
   findOne(@Param('id') id: string) {
     return this.mascotaService.findOne(+id);
