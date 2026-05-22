@@ -85,6 +85,27 @@ export class UsuarioService {
     return { mensaje: 'Operación realizada exitosamente.' };
   }
 
+  async aprobar(id: number) {
+    const usuario = await this.findOne(id);
+    if (usuario.estado !== EstadoUsuario.PENDIENTE_APROBACION) {
+      throw new ConflictException('La cuenta no está en estado PENDIENTE_APROBACION');
+    }
+    await this.usuarioRepository.update(id, { estado: EstadoUsuario.ACTIVO });
+    return { mensaje: 'Operación realizada exitosamente.' };
+  }
+
+  async rechazar(id: number) {
+    await this.findOne(id);
+    await this.usuarioRepository.update(id, { estado: EstadoUsuario.RECHAZADO });
+    return { mensaje: 'Operación realizada exitosamente.' };
+  }
+
+  async suspender(id: number) {
+    await this.findOne(id);
+    await this.usuarioRepository.update(id, { estado: EstadoUsuario.SUSPENDIDO });
+    return { mensaje: 'Operación realizada exitosamente.' };
+  }
+
   async create(createUsuarioDto: CreateUsuarioDto) {
     const usuario = this.usuarioRepository.create(createUsuarioDto);
     await this.usuarioRepository.save(usuario);

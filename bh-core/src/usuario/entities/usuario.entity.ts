@@ -16,6 +16,7 @@ export enum EstadoUsuario {
   PENDIENTE_APROBACION = 'PENDIENTE_APROBACION',
   ACTIVO = 'ACTIVO',
   RECHAZADO = 'RECHAZADO',
+  SUSPENDIDO = 'SUSPENDIDO',
 }
 
 @Entity('Usuario')
