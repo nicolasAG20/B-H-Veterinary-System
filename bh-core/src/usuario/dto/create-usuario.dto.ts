@@ -1,6 +1,22 @@
 import { IsEmail, IsEnum, IsOptional, IsString, MinLength } from 'class-validator';
 import { EstadoUsuario, RolUsuario } from '../entities/usuario.entity';
 
+export class RegistroUsuarioDto {
+  @IsString()
+  @MinLength(2)
+  nombre: string;
+
+  @IsEmail()
+  correo: string;
+
+  @IsString()
+  @MinLength(6)
+  contrasena: string;
+
+  @IsEnum(RolUsuario)
+  rol: RolUsuario;
+}
+
 export class CreateUsuarioDto {
   @IsString()
   @MinLength(2)
