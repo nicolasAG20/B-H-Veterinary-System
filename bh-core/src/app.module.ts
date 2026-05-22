@@ -13,6 +13,7 @@ import { VacunacionModule } from './vacunacion/vacunacion.module';
 import { FacturaModule } from './factura/factura.module';
 import { HospitalizacionModule } from './hospitalizacion/hospitalizacion.module';
 import { NotaEvolucionModule } from './nota-evolucion/nota-evolucion.module';
+import { AuthModule } from './auth/auth.module';
 
 @Module({
   imports: [
@@ -43,6 +44,7 @@ import { NotaEvolucionModule } from './nota-evolucion/nota-evolucion.module';
     FacturaModule,
     HospitalizacionModule,
     NotaEvolucionModule,
+    AuthModule,
   ],
 })
 export class AppModule {}

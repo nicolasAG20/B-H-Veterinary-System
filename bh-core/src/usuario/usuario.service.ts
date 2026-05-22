@@ -1,8 +1,9 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import { ConflictException, Injectable, NotFoundException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
-import { Usuario } from './entities/usuario.entity';
-import { CreateUsuarioDto } from './dto/create-usuario.dto';
+import * as bcrypt from 'bcrypt';
+import { EstadoUsuario, Usuario } from './entities/usuario.entity';
+import { CreateUsuarioDto, RegistroUsuarioDto } from './dto/create-usuario.dto';
 import { UpdateUsuarioDto } from './dto/update-usuario.dto';
 
 @Injectable()
@@ -11,6 +12,31 @@ export class UsuarioService {
     @InjectRepository(Usuario)
     private readonly usuarioRepository: Repository<Usuario>,
   ) {}
+
+  async registro(dto: RegistroUsuarioDto) {
+    const existe = await this.usuarioRepository.findOne({
+      where: { correo: dto.correo },
+    });
+    if (existe) {
+      throw new ConflictException('El correo ya está registrado');
+    }
+
+    const contrasenaHasheada = await bcrypt.hash(dto.contrasena, 10);
+
+    const usuario = this.usuarioRepository.create({
+      nombre: dto.nombre,
+      correo: dto.correo,
+      contrasena: contrasenaHasheada,
+      rol: dto.rol,
+      estado: EstadoUsuario.PENDIENTE_VERIFICACION,
+    });
+
+    await this.usuarioRepository.save(usuario);
+
+    return {
+      mensaje: 'Usuario registrado exitosamente. Se ha enviado un código de verificación al correo.',
+    };
+  }
 
   async create(createUsuarioDto: CreateUsuarioDto) {
     const usuario = this.usuarioRepository.create(createUsuarioDto);
