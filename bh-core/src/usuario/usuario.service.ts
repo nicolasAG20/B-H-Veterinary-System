@@ -21,6 +21,13 @@ export class UsuarioService {
     private readonly mailService: MailService,
   ) {}
 
+  /**
+   * Registra un nuevo usuario en el sistema.
+   * Hashea la contraseña, genera un código de verificación de 6 dígitos con
+   * expiración de 15 minutos, y envía el código al correo indicado.
+   * El estado inicial siempre es PENDIENTE_VERIFICACION sin importar el rol.
+   * @throws {ConflictException} Si el correo ya está registrado.
+   */
   async registro(dto: RegistroUsuarioDto) {
     const existe = await this.usuarioRepository.findOne({
       where: { correo: dto.correo },
@@ -53,6 +60,15 @@ export class UsuarioService {
     };
   }
 
+  /**
+   * Verifica el código enviado al correo del usuario.
+   * Si el código es válido y no ha expirado, actualiza el estado según el rol:
+   * - CLIENTE → ACTIVO
+   * - VETERINARIO / RECEPCIONISTA → PENDIENTE_APROBACION (requiere aprobación del administrador)
+   * Limpia código y tiempo de expiración tras una verificación exitosa.
+   * @throws {NotFoundException} Si el correo no corresponde a ningún usuario.
+   * @throws {BadRequestException} Si el código es incorrecto o ha expirado.
+   */
   async verificarCorreo(dto: VerificarCorreoDto) {
     const usuario = await this.usuarioRepository.findOne({
       where: { correo: dto.correo },
@@ -85,6 +101,12 @@ export class UsuarioService {
     return { mensaje: 'Operación realizada exitosamente.' };
   }
 
+  /**
+   * Aprueba la cuenta de un VETERINARIO o RECEPCIONISTA que ya verificó su correo.
+   * Solo es posible si el usuario está en estado PENDIENTE_APROBACION.
+   * @throws {NotFoundException} Si el usuario no existe.
+   * @throws {ConflictException} Si la cuenta no está en estado PENDIENTE_APROBACION.
+   */
   async aprobar(id: number) {
     const usuario = await this.findOne(id);
     if (usuario.estado !== EstadoUsuario.PENDIENTE_APROBACION) {
@@ -94,12 +116,20 @@ export class UsuarioService {
     return { mensaje: 'Operación realizada exitosamente.' };
   }
 
+  /**
+   * Rechaza la cuenta de un usuario, impidiendo su acceso al sistema.
+   * @throws {NotFoundException} Si el usuario no existe.
+   */
   async rechazar(id: number) {
     await this.findOne(id);
     await this.usuarioRepository.update(id, { estado: EstadoUsuario.RECHAZADO });
     return { mensaje: 'Operación realizada exitosamente.' };
   }
 
+  /**
+   * Suspende la cuenta de un usuario activo, bloqueando su acceso temporalmente.
+   * @throws {NotFoundException} Si el usuario no existe.
+   */
   async suspender(id: number) {
     await this.findOne(id);
     await this.usuarioRepository.update(id, { estado: EstadoUsuario.SUSPENDIDO });
