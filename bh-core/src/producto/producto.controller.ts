@@ -7,6 +7,7 @@ import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { RolesGuard } from '../auth/guards/roles.guard';
 import { Roles } from '../auth/decorators/roles.decorator';
 import { RolUsuario } from '../usuario/entities/usuario.entity';
+import { ListNearExpirationProductsDto } from './dto/list-near-expiration-products.dto';
 
 @Controller('products')
 export class ProductoController {
@@ -49,4 +50,19 @@ export class ProductoController {
     @Body() ajustarStockDto: AjustarStockDto,
   ) {
     return this.productoService.adjustStock(productId, ajustarStockDto);
-  }}
+  }
+
+  @Get('low-stock')
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(RolUsuario.ADMINISTRADOR)
+  findLowStock() {
+    return this.productoService.findLowStock();
+  }
+
+  @Get('near-expiration')
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(RolUsuario.ADMINISTRADOR)
+  findNearExpiration(@Query() query: ListNearExpirationProductsDto) {
+    return this.productoService.findNearExpiration(query.dias ?? 30);
+  }
+}

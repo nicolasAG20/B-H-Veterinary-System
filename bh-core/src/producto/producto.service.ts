@@ -81,4 +81,32 @@ export class ProductoService {
     producto.stock = nuevoStock;
     return this.productoRepository.save(producto);
   } 
+
+    async findLowStock(): Promise<Producto[]> {
+    return this.productoRepository
+      .createQueryBuilder('producto')
+      .where('producto.stock < producto.stock_minimo')
+      .orderBy('producto.stock', 'ASC')
+      .addOrderBy('producto.nombre', 'ASC')
+      .getMany();
+  }
+
+  async findNearExpiration(dias = 30): Promise<Producto[]> {
+    const fechaInicio = new Date();
+    fechaInicio.setHours(0, 0, 0, 0);
+
+    const fechaFin = new Date(fechaInicio);
+    fechaFin.setDate(fechaFin.getDate() + dias);
+    fechaFin.setHours(23, 59, 59, 999);
+
+    return this.productoRepository
+      .createQueryBuilder('producto')
+      .where('producto.fecha_vencimiento BETWEEN :fechaInicio AND :fechaFin', {
+        fechaInicio,
+        fechaFin,
+      })
+      .orderBy('producto.fecha_vencimiento', 'ASC')
+      .addOrderBy('producto.nombre', 'ASC')
+      .getMany();
+  }
 }
