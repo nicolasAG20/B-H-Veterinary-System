@@ -17,7 +17,9 @@ import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 
 /**
  * Controlador para la gestión de citas veterinarias.
+ *
  * Expone los endpoints bajo el prefijo `/api/v1/appointments`.
+ * Todos los endpoints requieren autenticación mediante JWT.
  */
 @UseGuards(JwtAuthGuard)
 @Controller('appointments')
@@ -38,10 +40,14 @@ export class CitaController {
   }
 
   /**
-   * Agenda una nueva cita veterinaria.
+   * Agenda una nueva cita veterinaria con verificación de pago obligatoria.
    *
-   * @param createCitaDto - Datos necesarios para crear la cita.
-   * @returns Cita creada.
+   * El sistema calcula el total a partir de los servicios seleccionados
+   * y verifica que el monto pagado sea suficiente antes de confirmar el
+   * agendamiento. Si el pago es aprobado, la cita queda en estado `AGENDADA`.
+   *
+   * @param createCitaDto - Datos de la cita incluyendo servicios y pago.
+   * @returns Mensaje de confirmación y la cita creada.
    */
   @Post()
   create(@Body() createCitaDto: CreateCitaDto) {

@@ -1,21 +1,22 @@
 import {
   IsArray,
   IsDateString,
-  IsEnum,
   IsInt,
   IsOptional,
   IsPositive,
   IsString,
+  ValidateNested,
 } from 'class-validator';
-
-import { EstadoCita } from '../entities/cita.entity';
+import { Type } from 'class-transformer';
+import { PagoDto } from './pago.dto';
 
 /**
- * DTO para la creación de una nueva cita veterinaria.
+ * DTO para el agendamiento de una nueva cita veterinaria.
  *
- * Contiene los datos requeridos para registrar y confirmar una cita,
- * incluyendo la mascota, el veterinario asignado, la fecha, los servicios
- * y la información de pago.
+ * Contiene los datos requeridos para registrar una cita con pago obligatorio.
+ * El sistema calcula el total automáticamente a partir de los servicios
+ * seleccionados y verifica que el monto pagado sea suficiente antes de
+ * confirmar el agendamiento.
  */
 export class CreateCitaDto {
   /**
@@ -24,29 +25,6 @@ export class CreateCitaDto {
    */
   @IsDateString({}, { message: 'La fecha y hora son obligatorias' })
   fecha_hora: string;
-
-  /**
-   * Estado inicial de la cita.
-   * Debe ser uno de los valores definidos en el enum `EstadoCita`.
-   */
-  @IsEnum(EstadoCita, { message: 'Estado inválido' })
-  estado: EstadoCita;
-
-  /**
-   * Precio total de la cita calculado a partir de los servicios.
-   * Campo opcional — puede ser calculado por el sistema.
-   */
-  @IsInt()
-  @IsOptional()
-  precio_total?: number;
-
-  /**
-   * Motivo de cancelación de la cita.
-   * Solo aplica cuando el estado es `CANCELADA`.
-   */
-  @IsString()
-  @IsOptional()
-  motivo_cancelacion?: string;
 
   /**
    * Identificador de la mascota que será atendida.
@@ -77,4 +55,20 @@ export class CreateCitaDto {
   @IsInt({ each: true })
   @IsOptional()
   servicioIds?: number[];
+
+  /**
+   * Motivo de cancelación de la cita.
+   * Solo aplica cuando la cita es cancelada posteriormente.
+   */
+  @IsString()
+  @IsOptional()
+  motivo_cancelacion?: string;
+
+  /**
+   * Información del pago realizado para confirmar el agendamiento.
+   * El monto debe cubrir el total calculado de los servicios seleccionados.
+   */
+  @ValidateNested()
+  @Type(() => PagoDto)
+  pago: PagoDto;
 }
