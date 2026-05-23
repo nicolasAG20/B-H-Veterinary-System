@@ -86,7 +86,15 @@ export class CitaController {
   update(@Param('id') id: string, @Body() updateCitaDto: UpdateCitaDto) {
     return this.citaService.update(+id, updateCitaDto);
   }
+  @Patch(':id/cancelar')
+  // ENDPOINT para cancelar citas
+  // Recibe el id de la cita por parametro
 
+  cancelar(@Param('id') id: string) {
+
+  // Llama el metodo cancelar() del service
+  return this.citaService.cancelar(+id);
+  }
   /**
    * Elimina una cita del sistema.
    *
