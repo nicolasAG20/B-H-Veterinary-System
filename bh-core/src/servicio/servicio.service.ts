@@ -1,6 +1,6 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import { ConflictException, Injectable, NotFoundException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
+import { FindOptionsWhere, Repository } from 'typeorm';
 import { Servicio } from './entities/servicio.entity';
 import { CreateServicioDto } from './dto/create-servicio.dto';
 import { UpdateServicioDto } from './dto/update-servicio.dto';
@@ -13,13 +13,18 @@ export class ServicioService {
   ) {}
 
   async create(createServicioDto: CreateServicioDto) {
-    const servicio = this.servicioRepository.create(createServicioDto);
-    await this.servicioRepository.save(servicio);
-    return { message: 'Servicio creado correctamente', servicio };
+    const servicio = this.servicioRepository.create({
+      ...createServicioDto,
+      activo: true,
+    });
+    return this.servicioRepository.save(servicio);
   }
 
-  async findAll() {
-    return this.servicioRepository.find();
+  async findAll(activo?: boolean) {
+    const where: FindOptionsWhere<Servicio> | undefined =
+      activo === undefined ? undefined : { activo };
+
+    return this.servicioRepository.find({ where });
   }
 
   async findOne(id: number) {
@@ -31,17 +36,21 @@ export class ServicioService {
   }
 
   async update(id: number, updateServicioDto: UpdateServicioDto) {
-    await this.findOne(id);
-    const updateData = Object.fromEntries(
-      Object.entries(updateServicioDto).filter(([, v]) => v !== undefined),
-    );
-    await this.servicioRepository.update(id, updateData);
-    return { message: 'Servicio actualizado', servicio: await this.findOne(id) };
+    const servicio = await this.findOne(id);
+    Object.assign(servicio, updateServicioDto);
+    return this.servicioRepository.save(servicio);
   }
 
-  async remove(id: number) {
-    await this.findOne(id);
-    await this.servicioRepository.delete(id);
-    return { message: 'Servicio eliminado correctamente' };
+  async deactivate(id: number) {
+    const servicio = await this.findOne(id);
+
+    if (!servicio.activo) {
+      throw new ConflictException('El servicio ya se encuentra desactivado');
+    }
+
+    servicio.activo = false;
+    await this.servicioRepository.save(servicio);
+
+    return { mensaje: 'Servicio desactivado exitosamente' };
   }
 }
