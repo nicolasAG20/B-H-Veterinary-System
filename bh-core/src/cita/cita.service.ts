@@ -1,4 +1,10 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import {
+  BadRequestException,
+  ConflictException,
+  Injectable,
+  NotFoundException,
+} from '@nestjs/common';
+
 import { InjectRepository } from '@nestjs/typeorm';
 import { In, Repository } from 'typeorm';
 
@@ -29,7 +35,6 @@ export class CitaService {
 
     /**
      * Validar conflicto de horario del veterinario.
-     * En la base de datos el veterinario se guarda en la columna Usuario_id.
      */
     const citaExistente = await this.citaRepository.findOne({
       where: {
@@ -47,26 +52,29 @@ export class CitaService {
       );
     }
 
-    const servicios = servicioIds?.length
-      ? await this.servicioRepository.findBy({
-          idServicio: In(servicioIds),
-        })
-      : [];
+    /**
+     * Validar servicios activos.
+     */
+    const servicios = await this.findServiciosActivosOrFail(
+      servicioIds,
+    );
 
     /**
-     * Crear la cita.
-     * Se usa usuario con veterinarioId porque la entidad Cita no tiene
-     * la propiedad veterinario, solo tiene la relación usuario.
+     * Crear cita.
      */
     const cita = this.citaRepository.create({
       ...rest,
+
       fecha_hora,
+
       mascota: {
         idMascota: mascotaId,
       } as any,
+
       usuario: {
         id: veterinarioId || usuarioId,
       } as any,
+
       servicios,
     });
 
@@ -93,13 +101,18 @@ export class CitaService {
     });
 
     if (!cita) {
-      throw new NotFoundException(`Cita #${id} no encontrada`);
+      throw new NotFoundException(
+        `Cita #${id} no encontrada`,
+      );
     }
 
     return cita;
   }
 
-  async update(id: number, updateCitaDto: UpdateCitaDto) {
+  async update(
+    id: number,
+    updateCitaDto: UpdateCitaDto,
+  ) {
     const cita = await this.findOne(id);
 
     const {
@@ -111,7 +124,9 @@ export class CitaService {
     } = updateCitaDto as any;
 
     const updateData: any = Object.fromEntries(
-      Object.entries(rest).filter(([, value]) => value !== undefined),
+      Object.entries(rest).filter(
+        ([, value]) => value !== undefined,
+      ),
     );
 
     if (mascotaId !== undefined) {
@@ -131,9 +146,10 @@ export class CitaService {
     }
 
     if (servicioIds !== undefined) {
-      cita.servicios = await this.servicioRepository.findBy({
-        idServicio: In(servicioIds),
-      });
+      cita.servicios =
+        await this.findServiciosActivosOrFail(
+          servicioIds,
+        );
     }
 
     Object.assign(cita, updateData);
@@ -154,5 +170,58 @@ export class CitaService {
     return {
       message: 'Cita eliminada correctamente',
     };
+  }
+
+  /**
+   * Validar servicios activos.
+   */
+  private async findServiciosActivosOrFail(
+    servicioIds?: number[],
+  ): Promise<Servicio[]> {
+    if (!servicioIds?.length) {
+      return [];
+    }
+
+    const uniqueServicioIds = [...new Set(servicioIds)];
+
+    const servicios =
+      await this.servicioRepository.findBy({
+        idServicio: In(uniqueServicioIds),
+      });
+
+    const foundServicioIds = new Set(
+      servicios.map(
+        (servicio) => servicio.idServicio,
+      ),
+    );
+
+    const missingServicioIds =
+      uniqueServicioIds.filter(
+        (servicioId) =>
+          !foundServicioIds.has(servicioId),
+      );
+
+    if (missingServicioIds.length > 0) {
+      throw new BadRequestException(
+        `Servicios no encontrados: ${missingServicioIds.join(', ')}`,
+      );
+    }
+
+    const inactiveServicios = servicios.filter(
+      (servicio) => !servicio.activo,
+    );
+
+    if (inactiveServicios.length > 0) {
+      const inactiveServicioIds =
+        inactiveServicios.map(
+          (servicio) => servicio.idServicio,
+        );
+
+      throw new ConflictException(
+        `Servicios desactivados: ${inactiveServicioIds.join(', ')}`,
+      );
+    }
+
+    return servicios;
   }
 }
