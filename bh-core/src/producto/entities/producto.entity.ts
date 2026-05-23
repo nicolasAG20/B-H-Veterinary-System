@@ -16,6 +16,9 @@ export class Producto {
   @Column({ type: 'bigint' })
   precio: number;
 
+  @Column({ length: 100 })
+  nombre: string;
+
   @Column({ type: 'datetime' })
   fecha_vencimiento: Date;
 
