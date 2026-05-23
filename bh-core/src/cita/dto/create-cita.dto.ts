@@ -32,6 +32,10 @@ export class CreateCitaDto {
   @IsPositive()
   usuarioId: number;
 
+  @IsInt()
+  @IsPositive()
+  veterinarioId: number;
+  
   @IsArray()
   @IsInt({ each: true })
   @IsOptional()
