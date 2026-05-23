@@ -1,4 +1,4 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import {BadRequestException, ConflictException, Injectable, NotFoundException,} from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { In, Repository } from 'typeorm';
 import { Cita } from './entities/cita.entity';
@@ -15,46 +15,40 @@ export class CitaService {
     private readonly servicioRepository: Repository<Servicio>,
   ) {}
 
-async create(createCitaDto: CreateCitaDto) {
+  async create(createCitaDto: CreateCitaDto) {
+    const { mascotaId, usuarioId, servicioIds, fecha_hora, ...rest } = createCitaDto;
 
-  const { mascotaId, usuarioId, servicioIds, fecha_hora, ...rest } = createCitaDto;
+    // VALIDAR SI YA EXISTE UNA CITA EN ESA FECHA
+    const citaExistente = await this.citaRepository.findOne({
+      where: {
+        fecha_hora: new Date(fecha_hora),
+      },
+    });
 
-  // VALIDAR SI YA EXISTE UNA CITA EN ESA FECHA
-  const citaExistente = await this.citaRepository.findOne({
-    where: {
-      fecha_hora: new Date(fecha_hora),
-    },
-  });
+    if (citaExistente) {
+      throw new NotFoundException(
+        'La fecha y hora seleccionadas no están disponibles',
+      );
+    }
 
-  if (citaExistente) {
-    throw new NotFoundException(
-      'La fecha y hora seleccionadas no están disponibles',
-    );
+    const servicios = await this.findServiciosActivosOrFail(servicioIds);
+
+    // CREAR CITA
+    const cita = this.citaRepository.create({
+      ...rest,
+      fecha_hora,
+      mascota: { idMascota: mascotaId } as any,
+      usuario: { id: usuarioId } as any,
+      servicios,
+    });
+
+    await this.citaRepository.save(cita);
+
+    return {
+      message: 'Cita agendada correctamente',
+      cita,
+    };
   }
-
-  // BUSCAR SERVICIOS
-  const servicios = servicioIds?.length
-    ? await this.servicioRepository.findBy({
-        idServicio: In(servicioIds),
-      })
-    : [];
-
-  // CREAR CITA
-  const cita = this.citaRepository.create({
-    ...rest,
-    fecha_hora,
-    mascota: { idMascota: mascotaId } as any,
-    usuario: { id: usuarioId } as any,
-    servicios,
-  });
-
-  await this.citaRepository.save(cita);
-
-  return {
-    message: 'Cita agendada correctamente',
-    cita,
-  };
-}
 
   async findAll() {
     return this.citaRepository.find({ relations: ['mascota', 'usuario', 'servicios'] });
@@ -80,7 +74,7 @@ async create(createCitaDto: CreateCitaDto) {
     if (mascotaId !== undefined) updateData.mascota = { idMascota: mascotaId };
     if (usuarioId !== undefined) updateData.usuario = { id: usuarioId };
     if (servicioIds !== undefined) {
-      cita.servicios = await this.servicioRepository.findBy({ idServicio: In(servicioIds) });
+      cita.servicios = await this.findServiciosActivosOrFail(servicioIds);
     }
     Object.assign(cita, updateData);
     await this.citaRepository.save(cita);
@@ -91,5 +85,42 @@ async create(createCitaDto: CreateCitaDto) {
     await this.findOne(id);
     await this.citaRepository.delete(id);
     return { message: 'Cita eliminada correctamente' };
+  }
+
+  private async findServiciosActivosOrFail(servicioIds?: number[],): Promise<Servicio[]> {
+    if (!servicioIds?.length) {
+      return [];
+    }
+
+    const uniqueServicioIds = [...new Set(servicioIds)];
+    const servicios = await this.servicioRepository.findBy({
+      idServicio: In(uniqueServicioIds),
+    });
+
+    const foundServicioIds = new Set(
+      servicios.map((servicio) => servicio.idServicio),
+    );
+    const missingServicioIds = uniqueServicioIds.filter(
+      (servicioId) => !foundServicioIds.has(servicioId),
+    );
+
+    if (missingServicioIds.length > 0) {
+      throw new BadRequestException(
+        `Servicios no encontrados: ${missingServicioIds.join(', ')}`,
+      );
+    }
+
+    const inactiveServicios = servicios.filter((servicio) => !servicio.activo);
+
+    if (inactiveServicios.length > 0) {
+      const inactiveServicioIds = inactiveServicios.map(
+        (servicio) => servicio.idServicio,
+      );
+      throw new ConflictException(
+        `Servicios desactivados: ${inactiveServicioIds.join(', ')}`,
+      );
+    }
+
+    return servicios;
   }
 }
