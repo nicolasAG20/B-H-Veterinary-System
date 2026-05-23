@@ -8,6 +8,7 @@ import {
   OneToMany,
   PrimaryGeneratedColumn,
 } from 'typeorm';
+
 import { Mascota } from '../../mascota/entities/mascota.entity';
 import { Usuario } from '../../usuario/entities/usuario.entity';
 import { Servicio } from '../../servicio/entities/servicio.entity';
@@ -46,15 +47,17 @@ export class Cita {
   @JoinColumn({ name: 'Usuario_id' })
   usuario: Usuario;
 
-  @ManyToOne(() => Usuario)
-  @JoinColumn({ name: 'Veterinario_id' })
-  veterinario: Usuario;
-
   @ManyToMany(() => Servicio, (servicio) => servicio.citas)
   @JoinTable({
     name: 'Cita_servicio',
-    joinColumn: { name: 'Cita_id', referencedColumnName: 'idCita' },
-    inverseJoinColumn: { name: 'Servicio_id', referencedColumnName: 'idServicio' },
+    joinColumn: {
+      name: 'Cita_id',
+      referencedColumnName: 'idCita',
+    },
+    inverseJoinColumn: {
+      name: 'Servicio_id',
+      referencedColumnName: 'idServicio',
+    },
   })
   servicios: Servicio[];
 

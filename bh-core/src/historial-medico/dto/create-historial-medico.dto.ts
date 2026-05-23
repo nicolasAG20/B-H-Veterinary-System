@@ -1,4 +1,16 @@
-import { IsDateString, IsInt, IsNumber, IsOptional, IsPositive, IsString } from 'class-validator';
+import { IsArray, IsDateString, IsInt, IsNumber, IsOptional, IsPositive, IsString, ValidateNested } from 'class-validator';
+import { Type } from 'class-transformer';
+
+class MedicamentoPrescritoDto {
+  @IsString()
+  nombre: string;
+
+  @IsString()
+  dosis: string;
+
+  @IsString()
+  duracion: string;
+}
 
 export class CreateHistorialMedicoDto {
   @IsString()
@@ -30,4 +42,9 @@ export class CreateHistorialMedicoDto {
   @IsInt()
   @IsPositive()
   usuarioId: number;
+
+  @IsArray()
+  @ValidateNested({ each: true })
+  @Type(() => MedicamentoPrescritoDto)
+  medicamentos_prescritos: MedicamentoPrescritoDto[];
 }
