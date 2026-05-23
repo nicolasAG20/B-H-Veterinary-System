@@ -1,17 +1,15 @@
-import { IsBoolean, IsInt, IsOptional, IsPositive, IsString } from 'class-validator';
+import { IsInt, IsNotEmpty, IsPositive, IsString } from 'class-validator';
 
 export class CreateServicioDto {
   @IsString()
+  @IsNotEmpty()
   nombre: string;
 
   @IsString()
-  @IsOptional()
-  descripcion?: string;
+  @IsNotEmpty()
+  descripcion: string;
 
   @IsInt()
   @IsPositive()
   precio: number;
-
-  @IsBoolean()
-  activo: boolean;
 }
