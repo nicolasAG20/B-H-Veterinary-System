@@ -1,0 +1,3157 @@
+openapi: 3.0.0
+info:
+  title: Sistema Veterinario B&H - API
+  description: >
+    API para la gestión integral de un sistema veterinario. Permite administrar
+    usuarios, clientes, mascotas, citas médicas, historial clínico, vacunación,
+    hospitalización, inventario de medicamentos e insumos, catálogo de servicios,
+    facturación, reportes en PDF y trazabilidad de acciones realizadas en el sistema.
+  version: 1.0.0
+
+servers:
+  - description: SwaggerHub API Auto Mocking
+    url: https://virtserver.swaggerhub.com/uam-ba9/veterinary-system-api/1.0.0
+  - url: http://localhost:8080/api/v1
+    description: Servidor local de desarrollo
+
+security:
+  - BearerAuth: []
+
+tags:
+  - name: Gestión de usuarios y autenticación
+    description: Endpoints relacionados con la gestión de usuarios y autenticación.
+  - name: Gestión de clientes y mascotas
+    description: Endpoints relacionados con la gestión de clientes y mascotas.
+  - name: Agenda de citas
+    description: Endpoints relacionados con el agendamiento de citas.
+  - name: Historial médico
+    description: Endpoints relacionados con el historial médico.
+  - name: Vacunación
+    description: Endpoints relacionados con la vacunación.
+  - name: Hospitalización
+    description: Endpoints relacionados con la hospitalización.
+  - name: Inventario de medicamentos e insumos
+    description: Endpoints relacionados con el inventario de medicamentos e insumos.
+  - name: Catálogo de servicios
+    description: Endpoints relacionados con el catálogo de servicios.
+  - name: Facturación
+    description: Endpoints relacionados con la facturación.
+  - name: Reportes en PDF
+    description: Endpoints relacionados con los reportes en PDF.
+  - name: Trazabilidad de acciones
+    description: Endpoints relacionados con la trazabilidad de acciones.
+
+paths:
+  # ============================================================
+  # GESTIÓN DE USUARIOS Y AUTENTICACIÓN
+  # ============================================================
+  /auth/register:
+    post:
+      tags:
+        - Gestión de usuarios y autenticación
+      summary: Registrar un usuario
+      description: >
+        Registra un nuevo usuario en el sistema y envía un código de verificación
+        al correo electrónico indicado. Si el rol es CLIENTE, la cuenta se activa
+        automáticamente al verificar el correo. Si el rol es VETERINARIO o
+        RECEPCIONISTA, debe esperar aprobación del administrador.
+      operationId: registerUser
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RegistroUsuarioRequest'
+      responses:
+        "201":
+          description: >
+            Usuario registrado exitosamente. Se ha enviado un código de
+            verificación al correo electrónico.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MensajeResponse'
+        "400":
+          description: Datos inválidos o incompletos.
+        "409":
+          description: El correo electrónico ya está registrado.
+
+  /auth/verify-email:
+    post:
+      tags:
+        - Gestión de usuarios y autenticación
+      summary: Verificar correo electrónico
+      description: >
+        Verifica el correo electrónico del usuario mediante el código enviado y
+        activa su cuenta si es CLIENTE. Si es VETERINARIO o RECEPCIONISTA, queda
+        pendiente de aprobación del administrador.
+      operationId: verifyEmail
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/VerificarCorreoRequest'
+      responses:
+        "200":
+          description: Correo verificado exitosamente.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MensajeResponse'
+        "400":
+          description: Código inválido o expirado.
+        "404":
+          description: Usuario no encontrado.
+
+  /auth/login:
+    post:
+      tags:
+        - Gestión de usuarios y autenticación
+      summary: Iniciar sesión
+      description: >
+        Autentica al usuario con su correo y contraseña. Solo es posible si el
+        estado de la cuenta es activo. El token retornado debe usarse en el
+        botón Authorize de Swagger para autenticar las demás peticiones.
+      operationId: loginUser
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/LoginRequest'
+      responses:
+        "200":
+          description: Inicio de sesión exitoso. Se retorna el token de autenticación.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/LoginResponse'
+        "401":
+          description: Credenciales inválidas.
+        "403":
+          description: >
+            La cuenta no está activa. Puede estar pendiente de verificación o
+            de aprobación del administrador.
+
+  /users:
+    get:
+      tags:
+        - Gestión de usuarios y autenticación
+      summary: Listar usuarios
+      description: >
+        Retorna la lista de usuarios del sistema. Solo accesible por
+        administradores. Permite filtrar por rol y estado.
+      operationId: listUsers
+      parameters:
+        - name: rol
+          in: query
+          schema:
+            type: string
+            enum:
+              - CLIENTE
+              - VETERINARIO
+              - RECEPCIONISTA
+              - ADMINISTRADOR
+        - name: estado
+          in: query
+          schema:
+            type: string
+            enum:
+              - PENDIENTE_VERIFICACION
+              - PENDIENTE_APROBACION
+              - ACTIVO
+              - SUSPENDIDO
+              - RECHAZADO
+      responses:
+        "200":
+          description: Listado de usuarios obtenido exitosamente.
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Usuario'
+        "401":
+          description: No autenticado.
+        "403":
+          description: No tiene permisos para acceder a este recurso.
+
+  /users/{userId}:
+    get:
+      tags:
+        - Gestión de usuarios y autenticación
+      summary: Obtener un usuario
+      description: Retorna la información detallada de un usuario específico.
+      operationId: getUserById
+      parameters:
+        - name: userId
+          in: path
+          required: true
+          schema:
+            type: integer
+          example: 1
+      responses:
+        "200":
+          description: Usuario obtenido exitosamente.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Usuario'
+        "401":
+          description: No autenticado.
+        "403":
+          description: No tiene permisos para acceder a este recurso.
+        "404":
+          description: Usuario no encontrado.
+
+  /users/{userId}/approve:
+    patch:
+      tags:
+        - Gestión de usuarios y autenticación
+      summary: Aprobar cuenta de usuario
+      description: >
+        El administrador aprueba la cuenta de un veterinario o recepcionista que
+        ya verificó su correo. Una vez aprobada, el usuario puede iniciar sesión.
+      operationId: approveUser
+      parameters:
+        - name: userId
+          in: path
+          required: true
+          schema:
+            type: integer
+          example: 2
+      responses:
+        "200":
+          description: Cuenta aprobada exitosamente.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MensajeResponse'
+        "401":
+          description: No autenticado.
+        "403":
+          description: No tiene permisos para realizar esta acción.
+        "404":
+          description: Usuario no encontrado.
+        "409":
+          description: La cuenta no está en estado pendiente de aprobación.
+
+  /users/{userId}/reject:
+    patch:
+      tags:
+        - Gestión de usuarios y autenticación
+      summary: Rechazar cuenta de usuario
+      description: >
+        El administrador rechaza la solicitud de cuenta de un veterinario o
+        recepcionista.
+      operationId: rejectUser
+      parameters:
+        - name: userId
+          in: path
+          required: true
+          schema:
+            type: integer
+          example: 2
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/MotivoRequest'
+      responses:
+        "200":
+          description: Cuenta rechazada exitosamente.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MensajeResponse'
+        "401":
+          description: No autenticado.
+        "403":
+          description: No tiene permisos para realizar esta acción.
+        "404":
+          description: Usuario no encontrado.
+
+  /users/{userId}/suspend:
+    patch:
+      tags:
+        - Gestión de usuarios y autenticación
+      summary: Suspender cuenta de usuario
+      description: >
+        El administrador suspende una cuenta activa. El usuario suspendido no
+        puede iniciar sesión.
+      operationId: suspendUser
+      parameters:
+        - name: userId
+          in: path
+          required: true
+          schema:
+            type: integer
+          example: 1
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/MotivoRequest'
+      responses:
+        "200":
+          description: Usuario suspendido exitosamente.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MensajeResponse'
+        "401":
+          description: No autenticado.
+        "403":
+          description: No tiene permisos para realizar esta acción.
+        "404":
+          description: Usuario no encontrado.
+
+  # ============================================================
+  # GESTIÓN DE CLIENTES Y MASCOTAS
+  # ============================================================
+  /clients:
+    get:
+      tags:
+        - Gestión de clientes y mascotas
+      summary: Listar clientes
+      description: >
+        Retorna la lista de clientes registrados. Permite búsqueda por nombre
+        o correo.
+      operationId: listClients
+      parameters:
+        - name: search
+          in: query
+          schema:
+            type: string
+          example: "Luisa"
+      responses:
+        "200":
+          description: Listado de clientes obtenido exitosamente.
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Cliente'
+        "401":
+          description: No autenticado.
+        "403":
+          description: No tiene permisos para acceder a este recurso.
+    post:
+      tags:
+        - Gestión de clientes y mascotas
+      summary: Registrar un cliente
+      description: >
+        La recepcionista registra un nuevo cliente directamente desde el sistema
+        (sin pasar por el flujo de autoregistro).
+      operationId: createClient
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CrearClienteRequest'
+      responses:
+        "201":
+          description: Cliente registrado exitosamente.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Cliente'
+        "400":
+          description: Datos inválidos o incompletos.
+        "401":
+          description: No autenticado.
+        "403":
+          description: No tiene permisos para realizar esta acción.
+        "409":
+          description: El correo electrónico ya está registrado.
+
+  /clients/{clientId}:
+    get:
+      tags:
+        - Gestión de clientes y mascotas
+      summary: Obtener un cliente
+      description: Retorna los datos de un cliente específico.
+      operationId: getClientById
+      parameters:
+        - name: clientId
+          in: path
+          required: true
+          schema:
+            type: integer
+          example: 1
+      responses:
+        "200":
+          description: Cliente obtenido exitosamente.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Cliente'
+        "401":
+          description: No autenticado.
+        "404":
+          description: Cliente no encontrado.
+    put:
+      tags:
+        - Gestión de clientes y mascotas
+      summary: Actualizar un cliente
+      description: Actualiza la información de contacto de un cliente.
+      operationId: updateClient
+      parameters:
+        - name: clientId
+          in: path
+          required: true
+          schema:
+            type: integer
+          example: 1
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ActualizarClienteRequest'
+      responses:
+        "200":
+          description: Cliente actualizado exitosamente.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Cliente'
+        "400":
+          description: Datos inválidos.
+        "401":
+          description: No autenticado.
+        "404":
+          description: Cliente no encontrado.
+
+  /clients/{clientId}/pets:
+    get:
+      tags:
+        - Gestión de clientes y mascotas
+      summary: Listar mascotas de un cliente
+      description: Retorna todas las mascotas asociadas a un cliente.
+      operationId: listClientPets
+      parameters:
+        - name: clientId
+          in: path
+          required: true
+          schema:
+            type: integer
+          example: 1
+      responses:
+        "200":
+          description: Listado de mascotas obtenido exitosamente.
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Mascota'
+        "401":
+          description: No autenticado.
+        "404":
+          description: Cliente no encontrado.
+    post:
+      tags:
+        - Gestión de clientes y mascotas
+      summary: Registrar una mascota
+      description: >
+        Registra una nueva mascota y la vincula al cliente indicado. La
+        recepcionista puede vincular una o varias mascotas a cada cliente.
+      operationId: createPet
+      parameters:
+        - name: clientId
+          in: path
+          required: true
+          schema:
+            type: integer
+          example: 1
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CrearMascotaRequest'
+      responses:
+        "201":
+          description: Mascota registrada exitosamente.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Mascota'
+        "400":
+          description: Datos inválidos o incompletos.
+        "401":
+          description: No autenticado.
+        "404":
+          description: Cliente no encontrado.
+
+  /pets/{petId}:
+    get:
+      tags:
+        - Gestión de clientes y mascotas
+      summary: Obtener una mascota
+      description: Retorna la información detallada de una mascota.
+      operationId: getPetById
+      parameters:
+        - name: petId
+          in: path
+          required: true
+          schema:
+            type: integer
+          example: 1
+      responses:
+        "200":
+          description: Mascota obtenida exitosamente.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Mascota'
+        "401":
+          description: No autenticado.
+        "404":
+          description: Mascota no encontrada.
+    put:
+      tags:
+        - Gestión de clientes y mascotas
+      summary: Actualizar una mascota
+      description: >
+        Actualiza la información de una mascota, incluyendo su peso. El peso
+        también puede actualizarse en cada visita a través del historial médico.
+      operationId: updatePet
+      parameters:
+        - name: petId
+          in: path
+          required: true
+          schema:
+            type: integer
+          example: 1
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ActualizarMascotaRequest'
+      responses:
+        "200":
+          description: Mascota actualizada exitosamente.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Mascota'
+        "400":
+          description: Datos inválidos.
+        "401":
+          description: No autenticado.
+        "404":
+          description: Mascota no encontrada.
+
+  /pets/{petId}/status:
+    patch:
+      tags:
+        - Gestión de clientes y mascotas
+      summary: Actualizar estado de una mascota
+      description: >
+        Actualiza el estado de una mascota. Los estados posibles son ACTIVA,
+        HOSPITALIZADA o FALLECIDA.
+      operationId: updatePetStatus
+      parameters:
+        - name: petId
+          in: path
+          required: true
+          schema:
+            type: integer
+          example: 1
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ActualizarEstadoMascotaRequest'
+      responses:
+        "200":
+          description: Estado actualizado exitosamente.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MensajeResponse'
+        "400":
+          description: Estado inválido.
+        "401":
+          description: No autenticado.
+        "404":
+          description: Mascota no encontrada.
+
+  # ============================================================
+  # AGENDA DE CITAS
+  # ============================================================
+  /appointments:
+    get:
+      tags:
+        - Agenda de citas
+      summary: Listar citas
+      description: >
+        Retorna las citas agendadas. Permite filtrar por veterinario, cliente,
+        mascota, estado y rango de fechas.
+      operationId: listAppointments
+      parameters:
+        - name: veterinarioId
+          in: query
+          schema:
+            type: integer
+        - name: clienteId
+          in: query
+          schema:
+            type: integer
+        - name: mascotaId
+          in: query
+          schema:
+            type: integer
+        - name: estado
+          in: query
+          schema:
+            type: string
+            enum:
+              - AGENDADA
+              - FINALIZADA
+              - CANCELADA
+        - name: fechaInicio
+          in: query
+          schema:
+            type: string
+            format: date
+        - name: fechaFin
+          in: query
+          schema:
+            type: string
+            format: date
+      responses:
+        "200":
+          description: Listado de citas obtenido exitosamente.
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Cita'
+        "401":
+          description: No autenticado.
+    post:
+      tags:
+        - Agenda de citas
+      summary: Agendar una cita
+      description: >
+        La recepcionista o el cliente agendan una nueva cita asignando
+        veterinario, fecha, hora y servicios. El pago es obligatorio para
+        confirmar el agendamiento. El sistema impide agendar dos citas al mismo
+        veterinario en el mismo horario. Al confirmar, se envía un correo al
+        cliente con la información de la cita, confirmación del pago y un
+        recordatorio de llegar con 10 minutos de anticipación.
+      operationId: createAppointment
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CrearCitaRequest'
+      responses:
+        "201":
+          description: >
+            Cita agendada y pagada exitosamente. Se ha enviado un correo de
+            confirmación con recordatorio de llegar 10 minutos antes.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Cita'
+        "400":
+          description: Datos inválidos o pago insuficiente.
+        "401":
+          description: No autenticado.
+        "409":
+          description: El veterinario ya tiene una cita asignada en ese horario.
+
+  /appointments/estimate:
+    post:
+      tags:
+        - Agenda de citas
+      summary: Estimar costo de una cita
+      description: >
+        Calcula y retorna el monto total de una cita a partir de los servicios
+        seleccionados, antes de confirmar el agendamiento. Permite al cliente o
+        a la recepcionista conocer el valor exacto a pagar previamente.
+      operationId: estimateAppointmentCost
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/EstimacionCitaRequest'
+      responses:
+        "200":
+          description: Estimación calculada exitosamente.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/EstimacionCitaResponse'
+        "400":
+          description: Datos inválidos o servicios no encontrados.
+        "401":
+          description: No autenticado.
+
+  /appointments/{appointmentId}:
+    get:
+      tags:
+        - Agenda de citas
+      summary: Obtener una cita
+      description: >
+        Retorna los detalles de una cita específica, incluyendo los servicios
+        asociados.
+      operationId: getAppointmentById
+      parameters:
+        - name: appointmentId
+          in: path
+          required: true
+          schema:
+            type: integer
+          example: 1
+      responses:
+        "200":
+          description: Cita obtenida exitosamente.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Cita'
+        "401":
+          description: No autenticado.
+        "404":
+          description: Cita no encontrada.
+
+  /appointments/{appointmentId}/cancel:
+    patch:
+      tags:
+        - Agenda de citas
+      summary: Cancelar una cita
+      description: >
+        Cancela una cita previamente agendada. Se debe registrar el motivo de
+        cancelación. El reembolso queda a criterio administrativo y no es
+        gestionado automáticamente por el sistema.
+      operationId: cancelAppointment
+      parameters:
+        - name: appointmentId
+          in: path
+          required: true
+          schema:
+            type: integer
+          example: 1
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CancelarCitaRequest'
+      responses:
+        "200":
+          description: Cita cancelada exitosamente.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MensajeResponse'
+        "400":
+          description: La cita no se puede cancelar (ya fue atendida o ya está cancelada).
+        "401":
+          description: No autenticado.
+        "404":
+          description: Cita no encontrada.
+
+  /appointments/{appointmentId}/complete:
+    patch:
+      tags:
+        - Agenda de citas
+      summary: Finalizar una cita
+      description: >
+        Marca una cita como finalizada una vez el veterinario ha atendido a la
+        mascota y registrado el historial médico.
+      operationId: completeAppointment
+      parameters:
+        - name: appointmentId
+          in: path
+          required: true
+          schema:
+            type: integer
+          example: 1
+      responses:
+        "200":
+          description: Cita finalizada exitosamente.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MensajeResponse'
+        "400":
+          description: >
+            La cita no se puede finalizar (no tiene historial médico registrado
+            o ya está finalizada).
+        "401":
+          description: No autenticado.
+        "404":
+          description: Cita no encontrada.
+
+  /vets/{vetId}/availability:
+    get:
+      tags:
+        - Agenda de citas
+      summary: Consultar disponibilidad de un veterinario
+      description: >
+        Retorna los horarios disponibles y ocupados de un veterinario en un
+        rango de fechas.
+      operationId: getVetAvailability
+      parameters:
+        - name: vetId
+          in: path
+          required: true
+          schema:
+            type: integer
+          example: 1
+        - name: fechaInicio
+          in: query
+          required: true
+          schema:
+            type: string
+            format: date
+          example: "2026-06-20"
+        - name: fechaFin
+          in: query
+          required: true
+          schema:
+            type: string
+            format: date
+          example: "2026-06-27"
+      responses:
+        "200":
+          description: Disponibilidad obtenida exitosamente.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DisponibilidadVeterinario'
+        "401":
+          description: No autenticado.
+        "404":
+          description: Veterinario no encontrado.
+
+  # ============================================================
+  # HISTORIAL MÉDICO
+  # ============================================================
+  /appointments/{appointmentId}/medical-record:
+    post:
+      tags:
+        - Historial médico
+      summary: Registrar historial médico de una cita
+      description: >
+        Al finalizar una cita, el veterinario registra el motivo de la visita,
+        diagnóstico, tratamiento, medicamentos prescritos, peso de la mascota y
+        fecha sugerida para la próxima visita. Los medicamentos prescritos
+        descuentan automáticamente del inventario. El peso registrado aquí
+        actualiza el historial de peso de la mascota.
+      operationId: createMedicalRecord
+      parameters:
+        - name: appointmentId
+          in: path
+          required: true
+          schema:
+            type: integer
+          example: 1
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CrearHistorialMedicoRequest'
+      responses:
+        "201":
+          description: Historial médico registrado exitosamente.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HistorialMedico'
+        "400":
+          description: Datos inválidos o incompletos.
+        "401":
+          description: No autenticado.
+        "403":
+          description: Solo el veterinario asignado a la cita puede registrar el historial.
+        "404":
+          description: Cita no encontrada.
+        "409":
+          description: >
+            La cita ya tiene un historial médico registrado o no fue atendida.
+
+  /pets/{petId}/medical-history:
+    get:
+      tags:
+        - Historial médico
+      summary: Obtener historial médico de una mascota
+      description: >
+        Retorna el historial médico completo de una mascota ordenado por fecha.
+        El cliente solo puede consultar el historial de sus propias mascotas.
+        Clientes y recepcionistas pueden consultar pero no modificar el historial.
+      operationId: getPetMedicalHistory
+      parameters:
+        - name: petId
+          in: path
+          required: true
+          schema:
+            type: integer
+          example: 1
+      responses:
+        "200":
+          description: Historial médico obtenido exitosamente.
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/HistorialMedico'
+        "401":
+          description: No autenticado.
+        "403":
+          description: No tiene permisos para acceder a este historial.
+        "404":
+          description: Mascota no encontrada.
+
+  /medical-records/{recordId}:
+    get:
+      tags:
+        - Historial médico
+      summary: Obtener un registro de historial médico
+      description: >
+        Retorna un registro específico del historial médico. Accesible por
+        veterinarios, recepcionistas y el cliente propietario de la mascota
+        (solo lectura).
+      operationId: getMedicalRecordById
+      parameters:
+        - name: recordId
+          in: path
+          required: true
+          schema:
+            type: integer
+          example: 42
+      responses:
+        "200":
+          description: Registro obtenido exitosamente.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HistorialMedico'
+        "401":
+          description: No autenticado.
+        "404":
+          description: Registro no encontrado.
+    put:
+      tags:
+        - Historial médico
+      summary: Corregir un registro de historial médico
+      description: >
+        El veterinario puede corregir un registro únicamente durante las
+        primeras 24 horas después de su creación. Pasado ese tiempo, el
+        registro queda inmutable.
+      operationId: updateMedicalRecord
+      parameters:
+        - name: recordId
+          in: path
+          required: true
+          schema:
+            type: integer
+          example: 42
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ActualizarHistorialMedicoRequest'
+      responses:
+        "200":
+          description: Registro actualizado exitosamente.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HistorialMedico'
+        "400":
+          description: Datos inválidos.
+        "401":
+          description: No autenticado.
+        "403":
+          description: >
+            Han pasado más de 24 horas desde la creación del registro, ya no
+            puede ser modificado.
+        "404":
+          description: Registro no encontrado.
+
+  # ============================================================
+  # VACUNACIÓN
+  # ============================================================
+  /medical-records/{recordId}/vaccinations:
+    post:
+      tags:
+        - Vacunación
+      summary: Registrar una vacuna
+      description: >
+        Registra una vacuna aplicada dentro del historial médico de la mascota.
+        Descuenta automáticamente el producto del inventario.
+      operationId: createVaccination
+      parameters:
+        - name: recordId
+          in: path
+          required: true
+          schema:
+            type: integer
+          example: 42
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CrearVacunaRequest'
+      responses:
+        "201":
+          description: Vacuna registrada exitosamente.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Vacunacion'
+        "400":
+          description: Datos inválidos o stock insuficiente.
+        "401":
+          description: No autenticado.
+        "404":
+          description: Historial médico o producto no encontrado.
+
+  /pets/{petId}/vaccinations:
+    get:
+      tags:
+        - Vacunación
+      summary: Obtener vacunas de una mascota
+      description: Retorna el historial de vacunación de una mascota.
+      operationId: getPetVaccinations
+      parameters:
+        - name: petId
+          in: path
+          required: true
+          schema:
+            type: integer
+          example: 1
+      responses:
+        "200":
+          description: Vacunas obtenidas exitosamente.
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Vacunacion'
+        "401":
+          description: No autenticado.
+        "404":
+          description: Mascota no encontrada.
+
+  /vaccinations/upcoming:
+    get:
+      tags:
+        - Vacunación
+      summary: Listar mascotas con vacunas próximas a vencer
+      description: >
+        Retorna las mascotas que tienen próximas dosis de vacunas a vencer
+        dentro de un rango de días, para contactar al cliente con anticipación.
+        Accesible por veterinarios y recepcionistas.
+      operationId: listUpcomingVaccinations
+      parameters:
+        - name: dias
+          in: query
+          description: Cantidad de días a futuro para considerar (por defecto 30).
+          schema:
+            type: integer
+            default: 30
+          example: 30
+      responses:
+        "200":
+          description: Listado obtenido exitosamente.
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Vacunacion'
+        "401":
+          description: No autenticado.
+
+  # ============================================================
+  # HOSPITALIZACIÓN
+  # ============================================================
+  /pets/{petId}/hospitalizations:
+    post:
+      tags:
+        - Hospitalización
+      summary: Internar una mascota
+      description: >
+        El veterinario interna a una mascota en la clínica. A partir de este
+        momento, el estado de la mascota cambia a HOSPITALIZADA.
+      operationId: createHospitalization
+      parameters:
+        - name: petId
+          in: path
+          required: true
+          schema:
+            type: integer
+          example: 1
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CrearHospitalizacionRequest'
+      responses:
+        "201":
+          description: Mascota internada exitosamente.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Hospitalizacion'
+        "400":
+          description: Datos inválidos.
+        "401":
+          description: No autenticado.
+        "403":
+          description: Solo un veterinario puede internar a una mascota.
+        "404":
+          description: Mascota no encontrada.
+        "409":
+          description: La mascota ya se encuentra hospitalizada.
+
+  /hospitalizations:
+    get:
+      tags:
+        - Hospitalización
+      summary: Listar hospitalizaciones
+      description: Retorna el listado de hospitalizaciones con filtros opcionales.
+      operationId: listHospitalizations
+      parameters:
+        - name: activas
+          in: query
+          description: >
+            Si es true, retorna solo las hospitalizaciones activas (sin fecha
+            de salida).
+          schema:
+            type: boolean
+          example: true
+      responses:
+        "200":
+          description: Listado obtenido exitosamente.
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Hospitalizacion'
+        "401":
+          description: No autenticado.
+
+  /hospitalizations/{hospitalizationId}:
+    get:
+      tags:
+        - Hospitalización
+      summary: Obtener una hospitalización
+      description: >
+        Retorna los detalles de una hospitalización específica con sus notas
+        de evolución.
+      operationId: getHospitalizationById
+      parameters:
+        - name: hospitalizationId
+          in: path
+          required: true
+          schema:
+            type: integer
+          example: 12
+      responses:
+        "200":
+          description: Hospitalización obtenida exitosamente.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Hospitalizacion'
+        "401":
+          description: No autenticado.
+        "404":
+          description: Hospitalización no encontrada.
+
+  /hospitalizations/{hospitalizationId}/discharge:
+    patch:
+      tags:
+        - Hospitalización
+      summary: Dar de alta una hospitalización
+      description: >
+        Registra la fecha de salida y el estado en que egresó la mascota. Los
+        estados posibles son RECUPERADA, FALLECIDA o TRASLADADA.
+      operationId: dischargeHospitalization
+      parameters:
+        - name: hospitalizationId
+          in: path
+          required: true
+          schema:
+            type: integer
+          example: 12
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/DarAltaRequest'
+      responses:
+        "200":
+          description: Alta registrada exitosamente.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MensajeResponse'
+        "400":
+          description: Datos inválidos.
+        "401":
+          description: No autenticado.
+        "404":
+          description: Hospitalización no encontrada.
+        "409":
+          description: La hospitalización ya fue dada de alta.
+
+  /hospitalizations/{hospitalizationId}/evolution-notes:
+    get:
+      tags:
+        - Hospitalización
+      summary: Listar notas de evolución
+      description: >
+        Retorna las notas de evolución registradas durante una hospitalización.
+      operationId: listEvolutionNotes
+      parameters:
+        - name: hospitalizationId
+          in: path
+          required: true
+          schema:
+            type: integer
+          example: 12
+      responses:
+        "200":
+          description: Notas obtenidas exitosamente.
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/NotaEvolucion'
+        "401":
+          description: No autenticado.
+        "404":
+          description: Hospitalización no encontrada.
+    post:
+      tags:
+        - Hospitalización
+      summary: Registrar una nota de evolución
+      description: >
+        El veterinario registra una nota de evolución diaria mientras la
+        mascota está internada.
+      operationId: createEvolutionNote
+      parameters:
+        - name: hospitalizationId
+          in: path
+          required: true
+          schema:
+            type: integer
+          example: 12
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CrearNotaEvolucionRequest'
+      responses:
+        "201":
+          description: Nota registrada exitosamente.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/NotaEvolucion'
+        "400":
+          description: Datos inválidos.
+        "401":
+          description: No autenticado.
+        "404":
+          description: Hospitalización no encontrada.
+
+  # ============================================================
+  # INVENTARIO DE MEDICAMENTOS E INSUMOS
+  # ============================================================
+  /products:
+    get:
+      tags:
+        - Inventario de medicamentos e insumos
+      summary: Listar productos
+      description: Retorna el inventario completo de productos. Permite filtrar por nombre.
+      operationId: listProducts
+      parameters:
+        - name: search
+          in: query
+          schema:
+            type: string
+          example: "Amoxicilina"
+      responses:
+        "200":
+          description: Listado obtenido exitosamente.
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Producto'
+        "401":
+          description: No autenticado.
+    post:
+      tags:
+        - Inventario de medicamentos e insumos
+      summary: Registrar un producto
+      description: El administrador registra un nuevo producto en el inventario.
+      operationId: createProduct
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CrearProductoRequest'
+      responses:
+        "201":
+          description: Producto registrado exitosamente.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Producto'
+        "400":
+          description: Datos inválidos.
+        "401":
+          description: No autenticado.
+        "403":
+          description: Solo el administrador puede registrar productos.
+
+  /products/{productId}:
+    get:
+      tags:
+        - Inventario de medicamentos e insumos
+      summary: Obtener un producto
+      description: Retorna la información detallada de un producto.
+      operationId: getProductById
+      parameters:
+        - name: productId
+          in: path
+          required: true
+          schema:
+            type: integer
+          example: 1
+      responses:
+        "200":
+          description: Producto obtenido exitosamente.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Producto'
+        "401":
+          description: No autenticado.
+        "404":
+          description: Producto no encontrado.
+    put:
+      tags:
+        - Inventario de medicamentos e insumos
+      summary: Actualizar un producto
+      description: El administrador actualiza la información de un producto.
+      operationId: updateProduct
+      parameters:
+        - name: productId
+          in: path
+          required: true
+          schema:
+            type: integer
+          example: 1
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ActualizarProductoRequest'
+      responses:
+        "200":
+          description: Producto actualizado exitosamente.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Producto'
+        "400":
+          description: Datos inválidos.
+        "401":
+          description: No autenticado.
+        "404":
+          description: Producto no encontrado.
+
+  /products/{productId}/stock:
+    patch:
+      tags:
+        - Inventario de medicamentos e insumos
+      summary: Ajustar stock de un producto
+      description: >
+        El administrador ajusta manualmente el stock de un producto. Requiere
+        registrar el motivo del ajuste.
+      operationId: adjustProductStock
+      parameters:
+        - name: productId
+          in: path
+          required: true
+          schema:
+            type: integer
+          example: 1
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AjustarStockRequest'
+      responses:
+        "200":
+          description: Stock ajustado exitosamente.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Producto'
+        "400":
+          description: Datos inválidos o stock resultante negativo.
+        "401":
+          description: No autenticado.
+        "404":
+          description: Producto no encontrado.
+
+  /products/low-stock:
+    get:
+      tags:
+        - Inventario de medicamentos e insumos
+      summary: Listar productos con stock bajo
+      description: >
+        Retorna los productos cuyo stock actual está por debajo del stock
+        mínimo definido.
+      operationId: listLowStockProducts
+      responses:
+        "200":
+          description: Listado obtenido exitosamente.
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Producto'
+        "401":
+          description: No autenticado.
+
+  /products/near-expiration:
+    get:
+      tags:
+        - Inventario de medicamentos e insumos
+      summary: Listar productos próximos a vencer
+      description: Retorna los productos que vencen dentro de un rango de días.
+      operationId: listNearExpirationProducts
+      parameters:
+        - name: dias
+          in: query
+          description: Cantidad de días a futuro para considerar (por defecto 30).
+          schema:
+            type: integer
+            default: 30
+          example: 30
+      responses:
+        "200":
+          description: Listado obtenido exitosamente.
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Producto'
+        "401":
+          description: No autenticado.
+
+  # ============================================================
+  # CATÁLOGO DE SERVICIOS
+  # ============================================================
+  /services:
+    get:
+      tags:
+        - Catálogo de servicios
+      summary: Listar servicios
+      description: >
+        Retorna el catálogo de servicios. Permite filtrar por estado activo.
+        Al agendar una cita, solo se pueden seleccionar servicios con
+        activo = true.
+      operationId: listServices
+      parameters:
+        - name: activo
+          in: query
+          schema:
+            type: boolean
+          example: true
+      responses:
+        "200":
+          description: Listado obtenido exitosamente.
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Servicio'
+        "401":
+          description: No autenticado.
+    post:
+      tags:
+        - Catálogo de servicios
+      summary: Crear un servicio
+      description: El administrador crea un nuevo servicio en el catálogo.
+      operationId: createService
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CrearServicioRequest'
+      responses:
+        "201":
+          description: Servicio creado exitosamente.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Servicio'
+        "400":
+          description: Datos inválidos.
+        "401":
+          description: No autenticado.
+        "403":
+          description: Solo el administrador puede crear servicios.
+
+  /services/{serviceId}:
+    get:
+      tags:
+        - Catálogo de servicios
+      summary: Obtener un servicio
+      description: Retorna la información detallada de un servicio.
+      operationId: getServiceById
+      parameters:
+        - name: serviceId
+          in: path
+          required: true
+          schema:
+            type: integer
+          example: 1
+      responses:
+        "200":
+          description: Servicio obtenido exitosamente.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Servicio'
+        "401":
+          description: No autenticado.
+        "404":
+          description: Servicio no encontrado.
+    put:
+      tags:
+        - Catálogo de servicios
+      summary: Actualizar un servicio
+      description: >
+        El administrador actualiza el nombre, descripción o precio de un
+        servicio.
+      operationId: updateService
+      parameters:
+        - name: serviceId
+          in: path
+          required: true
+          schema:
+            type: integer
+          example: 1
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ActualizarServicioRequest'
+      responses:
+        "200":
+          description: Servicio actualizado exitosamente.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Servicio'
+        "400":
+          description: Datos inválidos.
+        "401":
+          description: No autenticado.
+        "404":
+          description: Servicio no encontrado.
+
+  /services/{serviceId}/deactivate:
+    patch:
+      tags:
+        - Catálogo de servicios
+      summary: Desactivar un servicio
+      description: >
+        El administrador desactiva un servicio del catálogo. Un servicio
+        desactivado no puede seleccionarse al agendar nuevas citas, pero sigue
+        visible en las citas y facturas históricas.
+      operationId: deactivateService
+      parameters:
+        - name: serviceId
+          in: path
+          required: true
+          schema:
+            type: integer
+          example: 1
+      responses:
+        "200":
+          description: Servicio desactivado exitosamente.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MensajeResponse'
+        "401":
+          description: No autenticado.
+        "404":
+          description: Servicio no encontrado.
+        "409":
+          description: El servicio ya se encuentra desactivado.
+
+  # ============================================================
+  # FACTURACIÓN
+  # ============================================================
+  /appointments/{appointmentId}/invoice:
+    post:
+      tags:
+        - Facturación
+      summary: Generar factura de una cita
+      description: >
+        La recepcionista genera la factura al terminar la atención. Incluye los
+        servicios ya pagados al agendar más los medicamentos despachados, con
+        sus respectivos valores. Permite aplicar un descuento. El sistema
+        calcula el total automáticamente descontando lo ya pagado.
+      operationId: createInvoice
+      parameters:
+        - name: appointmentId
+          in: path
+          required: true
+          schema:
+            type: integer
+          example: 1
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/GenerarFacturaRequest'
+      responses:
+        "201":
+          description: Factura generada exitosamente.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Factura'
+        "400":
+          description: Datos inválidos.
+        "401":
+          description: No autenticado.
+        "403":
+          description: Solo la recepcionista puede generar facturas.
+        "404":
+          description: Cita no encontrada.
+        "409":
+          description: >
+            La cita ya tiene una factura asociada o no ha sido finalizada.
+
+  /invoices:
+    get:
+      tags:
+        - Facturación
+      summary: Listar facturas
+      description: >
+        Retorna el listado de facturas con filtros opcionales por cliente,
+        estado y rango de fechas. El cliente solo puede consultar sus propias
+        facturas filtrando por su clienteId.
+      operationId: listInvoices
+      parameters:
+        - name: clienteId
+          in: query
+          description: >
+            Filtra facturas por cliente. El cliente solo puede consultar sus
+            propias facturas.
+          schema:
+            type: integer
+          example: 1
+        - name: estado
+          in: query
+          schema:
+            type: string
+            enum:
+              - PENDIENTE
+              - PAGADA
+              - ANULADA
+        - name: fechaInicio
+          in: query
+          schema:
+            type: string
+            format: date
+        - name: fechaFin
+          in: query
+          schema:
+            type: string
+            format: date
+      responses:
+        "200":
+          description: Listado obtenido exitosamente.
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Factura'
+        "401":
+          description: No autenticado.
+
+  /invoices/{invoiceId}:
+    get:
+      tags:
+        - Facturación
+      summary: Obtener una factura
+      description: Retorna los detalles de una factura específica.
+      operationId: getInvoiceById
+      parameters:
+        - name: invoiceId
+          in: path
+          required: true
+          schema:
+            type: integer
+          example: 105
+      responses:
+        "200":
+          description: Factura obtenida exitosamente.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Factura'
+        "401":
+          description: No autenticado.
+        "404":
+          description: Factura no encontrada.
+
+  /invoices/{invoiceId}/cancel:
+    patch:
+      tags:
+        - Facturación
+      summary: Anular una factura
+      description: >
+        La recepcionista anula una factura. Debe registrar el motivo. La
+        anulación no borra el historial médico ni devuelve el inventario, solo
+        marca la factura como inválida.
+      operationId: cancelInvoice
+      parameters:
+        - name: invoiceId
+          in: path
+          required: true
+          schema:
+            type: integer
+          example: 105
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AnularFacturaRequest'
+      responses:
+        "200":
+          description: Factura anulada exitosamente.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MensajeResponse'
+        "400":
+          description: Datos inválidos.
+        "401":
+          description: No autenticado.
+        "404":
+          description: Factura no encontrada.
+        "409":
+          description: La factura ya se encuentra anulada.
+
+  /invoices/{invoiceId}/pdf:
+    get:
+      tags:
+        - Facturación
+      summary: Descargar factura en PDF
+      description: >
+        Retorna la factura en formato PDF. El cliente puede descargar las
+        facturas asociadas a sus citas en cualquier momento.
+      operationId: downloadInvoicePdf
+      parameters:
+        - name: invoiceId
+          in: path
+          required: true
+          schema:
+            type: integer
+          example: 105
+      responses:
+        "200":
+          description: PDF generado exitosamente.
+          content:
+            application/pdf:
+              schema:
+                type: string
+                format: binary
+        "401":
+          description: No autenticado.
+        "403":
+          description: No tiene permisos para descargar esta factura.
+        "404":
+          description: Factura no encontrada.
+
+  # ============================================================
+  # REPORTES EN PDF
+  # ============================================================
+  /reports/appointments:
+    get:
+      tags:
+        - Reportes en PDF
+      summary: Reporte de citas por período
+      description: >
+        Genera un PDF con todas las citas en un rango de fechas, incluyendo
+        cliente, mascota, veterinario que atendió y estado final.
+      operationId: generateAppointmentsReport
+      parameters:
+        - name: fechaInicio
+          in: query
+          required: true
+          schema:
+            type: string
+            format: date
+          example: "2026-01-01"
+        - name: fechaFin
+          in: query
+          required: true
+          schema:
+            type: string
+            format: date
+          example: "2026-06-30"
+      responses:
+        "200":
+          description: Reporte generado exitosamente.
+          content:
+            application/pdf:
+              schema:
+                type: string
+                format: binary
+        "400":
+          description: Parámetros inválidos.
+        "401":
+          description: No autenticado.
+        "403":
+          description: Solo el administrador puede generar este reporte.
+
+  /reports/billing:
+    get:
+      tags:
+        - Reportes en PDF
+      summary: Reporte de facturación por período
+      description: >
+        Genera un PDF con el resumen de todas las facturas generadas en un
+        rango de fechas, incluyendo total facturado, descuentos aplicados y
+        estado de cada factura.
+      operationId: generateBillingReport
+      parameters:
+        - name: fechaInicio
+          in: query
+          required: true
+          schema:
+            type: string
+            format: date
+          example: "2026-01-01"
+        - name: fechaFin
+          in: query
+          required: true
+          schema:
+            type: string
+            format: date
+          example: "2026-06-30"
+      responses:
+        "200":
+          description: Reporte generado exitosamente.
+          content:
+            application/pdf:
+              schema:
+                type: string
+                format: binary
+        "400":
+          description: Parámetros inválidos.
+        "401":
+          description: No autenticado.
+        "403":
+          description: Solo el administrador puede generar este reporte.
+
+  /reports/inventory:
+    get:
+      tags:
+        - Reportes en PDF
+      summary: Reporte de inventario actual
+      description: >
+        Genera un PDF con el listado completo de productos, incluyendo stock
+        disponible, precio, fecha de vencimiento e identificación de productos
+        con stock bajo o próximos a vencer.
+      operationId: generateInventoryReport
+      responses:
+        "200":
+          description: Reporte generado exitosamente.
+          content:
+            application/pdf:
+              schema:
+                type: string
+                format: binary
+        "401":
+          description: No autenticado.
+        "403":
+          description: Solo el administrador puede generar este reporte.
+
+  /reports/action-history:
+    get:
+      tags:
+        - Reportes en PDF
+      summary: Reporte de historial de acciones
+      description: >
+        Genera un PDF con el registro de todas las acciones relevantes ocurridas
+        en el sistema en un rango de fechas. La información se obtiene del
+        servicio bh-audit.
+      operationId: generateActionHistoryReport
+      parameters:
+        - name: fechaInicio
+          in: query
+          required: true
+          schema:
+            type: string
+            format: date
+          example: "2026-01-01"
+        - name: fechaFin
+          in: query
+          required: true
+          schema:
+            type: string
+            format: date
+          example: "2026-06-30"
+      responses:
+        "200":
+          description: Reporte generado exitosamente.
+          content:
+            application/pdf:
+              schema:
+                type: string
+                format: binary
+        "400":
+          description: Parámetros inválidos.
+        "401":
+          description: No autenticado.
+        "403":
+          description: Solo el administrador puede generar este reporte.
+
+  # ============================================================
+  # TRAZABILIDAD DE ACCIONES (bh-audit)
+  # ============================================================
+  # Estos endpoints pertenecen al servicio bh-audit. Solo son
+  # accesibles desde dentro del clúster por bh-core, nunca
+  # desde el exterior.
+  # ============================================================
+  /audit/events:
+    post:
+      tags:
+        - Trazabilidad de acciones
+      summary: Registrar un evento de auditoría
+      description: >
+        Endpoint interno usado por bh-core para notificar al servicio bh-audit
+        cada vez que ocurre una acción relevante. No es accesible desde fuera
+        del clúster.
+      operationId: createAuditEvent
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RegistrarEventoAuditoriaRequest'
+      responses:
+        "201":
+          description: Evento registrado exitosamente.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MensajeResponse'
+        "400":
+          description: Datos inválidos.
+    get:
+      tags:
+        - Trazabilidad de acciones
+      summary: Consultar historial de acciones
+      description: >
+        Permite al administrador (a través de bh-core) consultar el historial
+        de acciones con filtros por tipo de acción, usuario, rol y rango de
+        fechas.
+      operationId: listAuditEvents
+      parameters:
+        - name: tipo_accion
+          in: query
+          schema:
+            type: string
+          example: CREACION_CITA
+        - name: usuarioId
+          in: query
+          schema:
+            type: integer
+          example: 1
+        - name: rol
+          in: query
+          schema:
+            type: string
+            enum:
+              - CLIENTE
+              - VETERINARIO
+              - RECEPCIONISTA
+              - ADMINISTRADOR
+        - name: fechaInicio
+          in: query
+          schema:
+            type: string
+            format: date
+          example: "2026-01-01"
+        - name: fechaFin
+          in: query
+          schema:
+            type: string
+            format: date
+          example: "2026-06-30"
+      responses:
+        "200":
+          description: Historial obtenido exitosamente.
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/EventoAuditoria'
+        "400":
+          description: Parámetros inválidos.
+        "401":
+          description: No autenticado.
+
+# ============================================================
+# COMPONENTS - SCHEMAS Y SEGURIDAD
+# ============================================================
+components:
+
+  securitySchemes:
+    BearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+      description: >
+        Token JWT obtenido al iniciar sesión en POST /auth/login.
+        Para probar los endpoints en Swagger UI, ejecuta primero el login,
+        copia el token de la respuesta y pégalo en el botón Authorize.
+        En el mock server de SwaggerHub, cualquier valor es aceptado como token.
+
+  schemas:
+    # ----------------------------------------------------------
+    # ENTIDADES (basadas en la base de datos)
+    # ----------------------------------------------------------
+    Usuario:
+      type: object
+      properties:
+        id:
+          type: integer
+          example: 1
+        nombre:
+          type: string
+          example: Salomé Toro
+        rol:
+          type: string
+          enum:
+            - CLIENTE
+            - VETERINARIO
+            - RECEPCIONISTA
+            - ADMINISTRADOR
+          example: VETERINARIO
+        correo:
+          type: string
+          format: email
+          example: salome.toro@email.com
+        estado:
+          type: string
+          enum:
+            - PENDIENTE_VERIFICACION
+            - PENDIENTE_APROBACION
+            - ACTIVO
+            - SUSPENDIDO
+            - RECHAZADO
+          example: ACTIVO
+
+    Cliente:
+      type: object
+      properties:
+        idCliente:
+          type: integer
+          example: 1
+        nombre:
+          type: string
+          example: Luisa Henao Posada
+        correo:
+          type: string
+          format: email
+          example: luisa.henao@email.com
+        telefono:
+          type: string
+          example: "3001234567"
+        direccion:
+          type: string
+          example: "Calle 123 #45-67"
+        saldo:
+          type: integer
+          example: 0
+        usuarioId:
+          type: integer
+          example: 1
+
+    Mascota:
+      type: object
+      properties:
+        idMascota:
+          type: integer
+          example: 1
+        nombre:
+          type: string
+          example: Luna
+        especie:
+          type: string
+          example: Perro
+        raza:
+          type: string
+          example: Golden Retriever
+        color:
+          type: string
+          example: Dorado
+        fecha_nacimiento:
+          type: string
+          format: date
+          example: "2021-06-15"
+        peso:
+          type: number
+          format: float
+          example: 25.5
+        estado:
+          type: string
+          enum:
+            - ACTIVA
+            - HOSPITALIZADA
+            - FALLECIDA
+          example: ACTIVA
+        clienteId:
+          type: integer
+          example: 1
+
+    Cita:
+      type: object
+      properties:
+        idCita:
+          type: integer
+          example: 1
+        fecha_hora:
+          type: string
+          format: date-time
+          example: "2026-06-20T10:00:00"
+        estado:
+          type: string
+          enum:
+            - AGENDADA
+            - FINALIZADA
+            - CANCELADA
+          example: AGENDADA
+        precio_total:
+          type: integer
+          example: 120000
+        motivo_cancelacion:
+          type: string
+          nullable: true
+          example: "El cliente no podrá asistir por motivos personales."
+        mascotaId:
+          type: integer
+          example: 1
+        veterinarioId:
+          type: integer
+          example: 1
+        servicios:
+          type: array
+          items:
+            $ref: '#/components/schemas/Servicio'
+
+    HistorialMedico:
+      type: object
+      properties:
+        idHistorial_medico:
+          type: integer
+          example: 42
+        motivo_visita:
+          type: string
+          example: "Control general y revisión de vacunas"
+        diagnostico:
+          type: string
+          example: >
+            Estado general saludable. Se recomienda continuar con esquema
+            de vacunación.
+        tratamiento:
+          type: string
+          example: "Aplicación de vacuna antirrábica y desparasitante oral."
+        peso_mascota:
+          type: number
+          format: float
+          example: 26.3
+        proxima_visita:
+          type: string
+          format: date-time
+          nullable: true
+          example: "2026-12-20T10:00:00"
+        fecha_creacion:
+          type: string
+          format: date-time
+          example: "2026-06-20T11:30:00"
+        citaId:
+          type: integer
+          example: 1
+        veterinarioId:
+          type: integer
+          example: 1
+        medicamentos:
+          type: array
+          items:
+            $ref: '#/components/schemas/Medicamento'
+
+    Medicamento:
+      type: object
+      properties:
+        idMedicamento:
+          type: integer
+          example: 17
+        nombre_medicamento:
+          type: string
+          example: "Amoxicilina"
+        dosis:
+          type: string
+          example: "500mg cada 8 horas"
+        duracion:
+          type: string
+          example: "7 días"
+        historialMedicoId:
+          type: integer
+          example: 42
+        productoId:
+          type: integer
+          example: 1
+
+    Vacunacion:
+      type: object
+      properties:
+        idVacunacion:
+          type: integer
+          example: 8
+        nombre_vacuna:
+          type: string
+          example: "Vacuna antirrábica"
+        fecha_aplicacion:
+          type: string
+          format: date-time
+          example: "2026-06-20T10:30:00"
+        fecha_proxima_dosis:
+          type: string
+          format: date-time
+          example: "2027-06-20T10:30:00"
+        historialMedicoId:
+          type: integer
+          example: 42
+        productoId:
+          type: integer
+          example: 1
+
+    Hospitalizacion:
+      type: object
+      properties:
+        idHospitalizacion:
+          type: integer
+          example: 12
+        motivo:
+          type: string
+          example: "Observación postquirúrgica tras cirugía abdominal."
+        fecha_ingreso:
+          type: string
+          format: date-time
+          example: "2026-06-21T08:00:00"
+        fecha_salida:
+          type: string
+          format: date-time
+          nullable: true
+          example: "2026-06-25T14:00:00"
+        estado_egreso:
+          type: string
+          enum:
+            - RECUPERADA
+            - FALLECIDA
+            - TRASLADADA
+          nullable: true
+          example: RECUPERADA
+        mascotaId:
+          type: integer
+          example: 1
+        veterinarioId:
+          type: integer
+          example: 1
+        notas_evolucion:
+          type: array
+          items:
+            $ref: '#/components/schemas/NotaEvolucion'
+
+    NotaEvolucion:
+      type: object
+      properties:
+        idNota_evolucion:
+          type: integer
+          example: 33
+        nota:
+          type: string
+          example: >
+            La mascota presenta mejoría. Apetito normal y signos vitales
+            estables.
+        fecha:
+          type: string
+          format: date
+          example: "2026-06-22"
+        hospitalizacionId:
+          type: integer
+          example: 12
+
+    Producto:
+      type: object
+      properties:
+        idProducto:
+          type: integer
+          example: 1
+        nombre:
+          type: string
+          example: "Amoxicilina 500mg"
+        stock:
+          type: integer
+          example: 100
+        stock_minimo:
+          type: integer
+          example: 20
+        precio:
+          type: integer
+          format: int64
+          example: 15000
+        fecha_vencimiento:
+          type: string
+          format: date-time
+          example: "2027-12-31T00:00:00"
+
+    Servicio:
+      type: object
+      properties:
+        idServicio:
+          type: integer
+          example: 1
+        nombre:
+          type: string
+          example: "Consulta general"
+        descripcion:
+          type: string
+          example: "Revisión médica general de la mascota."
+        precio:
+          type: integer
+          example: 50000
+        activo:
+          type: boolean
+          example: true
+
+    Factura:
+      type: object
+      properties:
+        idFactura:
+          type: integer
+          example: 105
+        fecha_creacion:
+          type: string
+          format: date-time
+          example: "2026-06-20T12:00:00"
+        total:
+          type: integer
+          example: 130000
+        subtotal:
+          type: integer
+          example: 140000
+        descuento:
+          type: integer
+          example: 10000
+        monto_pagado:
+          type: integer
+          example: 120000
+        estado:
+          type: string
+          enum:
+            - PENDIENTE
+            - PAGADA
+            - ANULADA
+          example: PAGADA
+        motivo_anulacion:
+          type: string
+          nullable: true
+          example: "Error en los servicios facturados."
+        citaId:
+          type: integer
+          example: 1
+        detalles:
+          type: array
+          items:
+            $ref: '#/components/schemas/DetalleFactura'
+
+    DetalleFactura:
+      type: object
+      properties:
+        descripcion:
+          type: string
+          example: "Consulta general"
+        tipo:
+          type: string
+          enum:
+            - SERVICIO
+            - MEDICAMENTO
+          example: SERVICIO
+        cantidad:
+          type: integer
+          example: 1
+        precio_unitario:
+          type: integer
+          example: 50000
+        subtotal:
+          type: integer
+          example: 50000
+
+    EventoAuditoria:
+      type: object
+      properties:
+        id:
+          type: integer
+          example: 9871
+        tipo_accion:
+          type: string
+          example: CREACION_CITA
+        usuarioId:
+          type: integer
+          example: 1
+        nombre_usuario:
+          type: string
+          example: Juan Diego Pinilla
+        rol:
+          type: string
+          enum:
+            - CLIENTE
+            - VETERINARIO
+            - RECEPCIONISTA
+            - ADMINISTRADOR
+          example: RECEPCIONISTA
+        fecha_hora:
+          type: string
+          format: date-time
+          example: "2026-06-20T09:45:00"
+        detalle:
+          type: object
+          example:
+            citaId: 1
+            mascotaId: 1
+            veterinarioId: 1
+
+    DisponibilidadVeterinario:
+      type: object
+      properties:
+        veterinarioId:
+          type: integer
+          example: 1
+        fechaInicio:
+          type: string
+          format: date
+          example: "2026-06-20"
+        fechaFin:
+          type: string
+          format: date
+          example: "2026-06-27"
+        horarios:
+          type: array
+          items:
+            $ref: '#/components/schemas/HorarioDisponibilidad'
+
+    HorarioDisponibilidad:
+      type: object
+      properties:
+        fecha_hora:
+          type: string
+          format: date-time
+          example: "2026-06-20T10:00:00"
+        disponible:
+          type: boolean
+          example: true
+        citaId:
+          type: integer
+          nullable: true
+          example: null
+
+    # ----------------------------------------------------------
+    # REQUESTS - AUTENTICACIÓN
+    # ----------------------------------------------------------
+    RegistroUsuarioRequest:
+      type: object
+      required:
+        - nombre
+        - correo
+        - contrasena
+        - telefono
+        - direccion
+        - rol
+      properties:
+        nombre:
+          type: string
+          example: Luisa Henao Posada
+        correo:
+          type: string
+          format: email
+          example: luisa.henao@email.com
+        contrasena:
+          type: string
+          format: password
+          example: "Abc123*"
+        telefono:
+          type: string
+          example: "3001234567"
+        direccion:
+          type: string
+          example: "Calle 123 #45-67"
+        rol:
+          type: string
+          enum:
+            - CLIENTE
+            - VETERINARIO
+            - RECEPCIONISTA
+          example: CLIENTE
+
+    VerificarCorreoRequest:
+      type: object
+      required:
+        - codigo_verificacion
+      properties:
+        codigo_verificacion:
+          type: string
+          maxLength: 6
+          example: "483920"
+
+    LoginRequest:
+      type: object
+      required:
+        - correo
+        - contrasena
+      properties:
+        correo:
+          type: string
+          format: email
+          example: luisa.henao@email.com
+        contrasena:
+          type: string
+          format: password
+          example: "Abc123*"
+
+    LoginResponse:
+      type: object
+      properties:
+        token:
+          type: string
+          description: >
+            Token JWT para autenticar las demás peticiones. Cópialo y pégalo
+            en el botón Authorize de Swagger UI.
+          example: "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIxIiwibm9tYnJlIjoiTHVpc2EgSGVuYW8iLCJyb2wiOiJDTElFTlRFIiwiaWF0IjoxNzUwMDAwMDAwfQ.mock_signature_para_pruebas"
+        usuario:
+          $ref: '#/components/schemas/Usuario'
+
+    MotivoRequest:
+      type: object
+      required:
+        - motivo
+      properties:
+        motivo:
+          type: string
+          example: >
+            Documentación incompleta para validar credenciales profesionales.
+
+    MensajeResponse:
+      type: object
+      properties:
+        mensaje:
+          type: string
+          example: "Operación realizada exitosamente."
+
+    # ----------------------------------------------------------
+    # REQUESTS - CLIENTES Y MASCOTAS
+    # ----------------------------------------------------------
+    CrearClienteRequest:
+      type: object
+      required:
+        - nombre
+        - correo
+        - telefono
+        - direccion
+      properties:
+        nombre:
+          type: string
+          example: Gilary Valeria Rugeles
+        correo:
+          type: string
+          format: email
+          example: gilary.rugeles@email.com
+        telefono:
+          type: string
+          example: "3019876543"
+        direccion:
+          type: string
+          example: "Carrera 45 #12-30"
+
+    ActualizarClienteRequest:
+      type: object
+      properties:
+        nombre:
+          type: string
+          example: Luisa Henao Posada
+        telefono:
+          type: string
+          example: "3001234567"
+        direccion:
+          type: string
+          example: "Calle 123 #45-67"
+
+    CrearMascotaRequest:
+      type: object
+      required:
+        - nombre
+        - especie
+        - raza
+        - color
+        - fecha_nacimiento
+        - peso
+      properties:
+        nombre:
+          type: string
+          example: Luna
+        especie:
+          type: string
+          example: Perro
+        raza:
+          type: string
+          example: Golden Retriever
+        color:
+          type: string
+          example: Dorado
+        fecha_nacimiento:
+          type: string
+          format: date
+          example: "2021-06-15"
+        peso:
+          type: number
+          format: float
+          example: 25.5
+
+    ActualizarMascotaRequest:
+      type: object
+      properties:
+        nombre:
+          type: string
+          example: Luna
+        especie:
+          type: string
+          example: Perro
+        raza:
+          type: string
+          example: Golden Retriever
+        color:
+          type: string
+          example: Dorado
+        fecha_nacimiento:
+          type: string
+          format: date
+          example: "2021-06-15"
+        peso:
+          type: number
+          format: float
+          example: 26.0
+
+    ActualizarEstadoMascotaRequest:
+      type: object
+      required:
+        - estado
+      properties:
+        estado:
+          type: string
+          enum:
+            - ACTIVA
+            - HOSPITALIZADA
+            - FALLECIDA
+          example: ACTIVA
+
+    # ----------------------------------------------------------
+    # REQUESTS - CITAS
+    # ----------------------------------------------------------
+    EstimacionCitaRequest:
+      type: object
+      required:
+        - servicios
+      properties:
+        servicios:
+          type: array
+          items:
+            type: integer
+          example: [1, 3]
+
+    EstimacionCitaResponse:
+      type: object
+      properties:
+        total:
+          type: integer
+          example: 120000
+        detalles:
+          type: array
+          items:
+            type: object
+            properties:
+              servicioId:
+                type: integer
+                example: 1
+              nombre:
+                type: string
+                example: "Consulta general"
+              precio:
+                type: integer
+                example: 50000
+
+    CrearCitaRequest:
+      type: object
+      required:
+        - mascotaId
+        - veterinarioId
+        - fecha_hora
+        - servicios
+        - pago
+      properties:
+        mascotaId:
+          type: integer
+          example: 1
+        veterinarioId:
+          type: integer
+          example: 1
+        fecha_hora:
+          type: string
+          format: date-time
+          example: "2026-06-20T10:00:00"
+        servicios:
+          type: array
+          items:
+            type: integer
+          example: [1, 3]
+        pago:
+          $ref: '#/components/schemas/Pago'
+
+    Pago:
+      type: object
+      required:
+        - metodo
+        - monto
+      properties:
+        metodo:
+          type: string
+          enum:
+            - TARJETA
+            - EFECTIVO
+            - TRANSFERENCIA
+          example: TARJETA
+        monto:
+          type: integer
+          example: 120000
+
+    CancelarCitaRequest:
+      type: object
+      required:
+        - motivo_cancelacion
+      properties:
+        motivo_cancelacion:
+          type: string
+          example: "El cliente no podrá asistir por motivos personales."
+
+    # ----------------------------------------------------------
+    # REQUESTS - HISTORIAL MÉDICO
+    # ----------------------------------------------------------
+    CrearHistorialMedicoRequest:
+      type: object
+      required:
+        - motivo_visita
+        - diagnostico
+        - tratamiento
+        - peso_mascota
+      properties:
+        motivo_visita:
+          type: string
+          example: "Control general y revisión de vacunas"
+        diagnostico:
+          type: string
+          example: >
+            Estado general saludable. Se recomienda continuar con esquema
+            de vacunación.
+        tratamiento:
+          type: string
+          example: "Aplicación de vacuna antirrábica y desparasitante oral."
+        peso_mascota:
+          type: number
+          format: float
+          example: 26.3
+        proxima_visita:
+          type: string
+          format: date-time
+          example: "2026-12-20T10:00:00"
+        medicamentos:
+          type: array
+          items:
+            $ref: '#/components/schemas/CrearMedicamentoRequest'
+
+    ActualizarHistorialMedicoRequest:
+      type: object
+      properties:
+        motivo_visita:
+          type: string
+          example: "Control general y revisión de vacunas"
+        diagnostico:
+          type: string
+          example: "Estado general saludable."
+        tratamiento:
+          type: string
+          example: "Aplicación de vacuna antirrábica."
+        peso_mascota:
+          type: number
+          format: float
+          example: 26.3
+        proxima_visita:
+          type: string
+          format: date-time
+          example: "2026-12-20T10:00:00"
+
+    CrearMedicamentoRequest:
+      type: object
+      required:
+        - productoId
+        - nombre_medicamento
+        - dosis
+        - duracion
+      properties:
+        productoId:
+          type: integer
+          example: 1
+        nombre_medicamento:
+          type: string
+          example: "Amoxicilina"
+        dosis:
+          type: string
+          example: "500mg cada 8 horas"
+        duracion:
+          type: string
+          example: "7 días"
+
+    # ----------------------------------------------------------
+    # REQUESTS - VACUNACIÓN
+    # ----------------------------------------------------------
+    CrearVacunaRequest:
+      type: object
+      required:
+        - nombre_vacuna
+        - fecha_aplicacion
+        - fecha_proxima_dosis
+        - productoId
+      properties:
+        nombre_vacuna:
+          type: string
+          example: "Vacuna antirrábica"
+        fecha_aplicacion:
+          type: string
+          format: date-time
+          example: "2026-06-20T10:30:00"
+        fecha_proxima_dosis:
+          type: string
+          format: date-time
+          example: "2027-06-20T10:30:00"
+        productoId:
+          type: integer
+          example: 1
+
+    # ----------------------------------------------------------
+    # REQUESTS - HOSPITALIZACIÓN
+    # ----------------------------------------------------------
+    CrearHospitalizacionRequest:
+      type: object
+      required:
+        - fecha_ingreso
+        - motivo
+      properties:
+        fecha_ingreso:
+          type: string
+          format: date-time
+          example: "2026-06-21T08:00:00"
+        motivo:
+          type: string
+          example: "Observación postquirúrgica tras cirugía abdominal."
+
+    DarAltaRequest:
+      type: object
+      required:
+        - fecha_salida
+        - estado_egreso
+      properties:
+        fecha_salida:
+          type: string
+          format: date-time
+          example: "2026-06-25T14:00:00"
+        estado_egreso:
+          type: string
+          enum:
+            - RECUPERADA
+            - FALLECIDA
+            - TRASLADADA
+          example: RECUPERADA
+
+    CrearNotaEvolucionRequest:
+      type: object
+      required:
+        - nota
+        - fecha
+      properties:
+        nota:
+          type: string
+          example: >
+            La mascota presenta mejoría. Apetito normal y signos vitales
+            estables.
+        fecha:
+          type: string
+          format: date
+          example: "2026-06-22"
+
+    # ----------------------------------------------------------
+    # REQUESTS - INVENTARIO
+    # ----------------------------------------------------------
+    CrearProductoRequest:
+      type: object
+      required:
+        - nombre
+        - stock
+        - stock_minimo
+        - precio
+        - fecha_vencimiento
+      properties:
+        nombre:
+          type: string
+          example: "Amoxicilina 500mg"
+        stock:
+          type: integer
+          example: 100
+        stock_minimo:
+          type: integer
+          example: 20
+        precio:
+          type: integer
+          example: 15000
+        fecha_vencimiento:
+          type: string
+          format: date-time
+          example: "2027-12-31T00:00:00"
+
+    ActualizarProductoRequest:
+      type: object
+      properties:
+        nombre:
+          type: string
+          example: "Amoxicilina 500mg"
+        stock_minimo:
+          type: integer
+          example: 25
+        precio:
+          type: integer
+          example: 16000
+        fecha_vencimiento:
+          type: string
+          format: date-time
+          example: "2027-12-31T00:00:00"
+
+    AjustarStockRequest:
+      type: object
+      required:
+        - cantidad
+        - motivo
+      properties:
+        cantidad:
+          type: integer
+          description: Cantidad a sumar (positivo) o restar (negativo).
+          example: 50
+        motivo:
+          type: string
+          example: "Ingreso de nuevo lote del proveedor."
+
+    # ----------------------------------------------------------
+    # REQUESTS - CATÁLOGO DE SERVICIOS
+    # ----------------------------------------------------------
+    CrearServicioRequest:
+      type: object
+      required:
+        - nombre
+        - descripcion
+        - precio
+      properties:
+        nombre:
+          type: string
+          example: "Consulta general"
+        descripcion:
+          type: string
+          example: "Revisión médica general de la mascota."
+        precio:
+          type: integer
+          example: 50000
+
+    ActualizarServicioRequest:
+      type: object
+      properties:
+        nombre:
+          type: string
+          example: "Consulta general"
+        descripcion:
+          type: string
+          example: "Revisión médica general de la mascota."
+        precio:
+          type: integer
+          example: 55000
+
+    # ----------------------------------------------------------
+    # REQUESTS - FACTURACIÓN
+    # ----------------------------------------------------------
+    GenerarFacturaRequest:
+      type: object
+      properties:
+        descuento:
+          type: integer
+          description: Descuento aplicado en pesos.
+          example: 10000
+        medicamentos_adicionales:
+          type: array
+          items:
+            $ref: '#/components/schemas/MedicamentoAdicional'
+
+    MedicamentoAdicional:
+      type: object
+      required:
+        - productoId
+        - cantidad
+      properties:
+        productoId:
+          type: integer
+          example: 1
+        cantidad:
+          type: integer
+          example: 2
+
+    AnularFacturaRequest:
+      type: object
+      required:
+        - motivo_anulacion
+      properties:
+        motivo_anulacion:
+          type: string
+          example: >
+            Error en los servicios facturados; se reemite con valores
+            corregidos.
+
+    # ----------------------------------------------------------
+    # REQUESTS - TRAZABILIDAD
+    # ----------------------------------------------------------
+    RegistrarEventoAuditoriaRequest:
+      type: object
+      required:
+        - tipo_accion
+        - usuarioId
+        - nombre_usuario
+        - rol
+        - fecha_hora
+      properties:
+        tipo_accion:
+          type: string
+          enum:
+            - REGISTRO_USUARIO
+            - VERIFICACION_CORREO
+            - APROBACION_CUENTA
+            - RECHAZO_CUENTA
+            - INICIO_SESION_EXITOSO
+            - INICIO_SESION_FALLIDO
+            - CREACION_CITA
+            - CAMBIO_ESTADO_CITA
+            - CREACION_HISTORIAL_MEDICO
+            - EDICION_HISTORIAL_MEDICO
+            - REGISTRO_VACUNA
+            - INICIO_HOSPITALIZACION
+            - ALTA_HOSPITALIZACION
+            - CREACION_FACTURA
+            - ANULACION_FACTURA
+            - AJUSTE_INVENTARIO
+            - CREACION_SERVICIO
+            - EDICION_SERVICIO
+            - DESACTIVACION_SERVICIO
+            - PAGO_CITA
+            - SUSPENSION_USUARIO
+          example: CREACION_CITA
+        usuarioId:
+          type: integer
+          example: 1
+        nombre_usuario:
+          type: string
+          example: Juan Diego Pinilla
+        rol:
+          type: string
+          enum:
+            - CLIENTE
+            - VETERINARIO
+            - RECEPCIONISTA
+            - ADMINISTRADOR
+          example: RECEPCIONISTA
+        fecha_hora:
+          type: string
+          format: date-time
+          example: "2026-06-20T09:45:00"
+        detalle:
+          type: object
+          description: >
+            Información adicional del evento (varía según tipo_accion).
+          example:
+            citaId: 1
+            mascotaId: 1
+            veterinarioId: 1
