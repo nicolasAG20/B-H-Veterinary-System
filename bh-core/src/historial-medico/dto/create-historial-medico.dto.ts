@@ -7,6 +7,7 @@ import {
   IsNumber,
   IsPositive,
   IsString,
+  MaxLength,
   Min,
   ValidateNested,
 } from 'class-validator';
@@ -14,9 +15,12 @@ import {
 import { Type } from 'class-transformer';
 
 export class MedicamentoPrescritoDto {
-  @IsInt()
-  @IsPositive()
-  productoId: number;
+  @IsString()
+  @IsNotEmpty({
+    message: 'El nombre del medicamento es obligatorio',
+  })
+  @MaxLength(50)
+  nombre_medicamento: string;
 
   @IsString()
   @IsNotEmpty({

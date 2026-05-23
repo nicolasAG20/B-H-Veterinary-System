@@ -7,9 +7,6 @@ export class Vacunacion {
   @PrimaryGeneratedColumn()
   idVacunacion: number;
 
-  @Column({ length: 60 })
-  nombre_vacuna: string;
-
   @Column({ type: 'datetime' })
   fecha_proxima_dosis: Date;
 
