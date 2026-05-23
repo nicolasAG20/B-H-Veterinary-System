@@ -6,10 +6,7 @@ import { Producto } from '../../producto/entities/producto.entity';
 export class Medicamento {
   @PrimaryGeneratedColumn()
   idMedicamento: number;
-
-  @Column({ length: 50 })
-  nombre_medicamento: string;
-
+  
   @Column({ type: 'text' })
   dosis: string;
 
