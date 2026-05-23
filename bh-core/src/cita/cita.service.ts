@@ -15,46 +15,38 @@ export class CitaService {
     private readonly servicioRepository: Repository<Servicio>,
   ) {}
 
-async create(createCitaDto: CreateCitaDto) {
-
-  const { mascotaId, usuarioId, servicioIds, fecha_hora, ...rest } = createCitaDto;
-
-  // VALIDAR SI YA EXISTE UNA CITA EN ESA FECHA
-  const citaExistente = await this.citaRepository.findOne({
-    where: {
-      fecha_hora: new Date(fecha_hora),
+  async create(createCitaDto: CreateCitaDto) {
+    const {mascotaId, usuarioId, veterinarioId, servicioIds, fecha_hora, ...rest} = createCitaDto;
+    // VALIDAR CONFLICTO DE HORARIO DEL VETERINARIO
+    const citaExistente = await this.citaRepository.findOne({
+      where: {
+        fecha_hora: new Date(fecha_hora),
+        veterinario: {
+        id: veterinarioId,
+      },
     },
+    relations: ['veterinario'],
   });
 
   if (citaExistente) {
-    throw new NotFoundException(
-      'La fecha y hora seleccionadas no están disponibles',
-    );
+  throw new NotFoundException(
+    'El veterinario ya tiene una cita agendada en este horario',
+  );
   }
-
-  // BUSCAR SERVICIOS
-  const servicios = servicioIds?.length
-    ? await this.servicioRepository.findBy({
-        idServicio: In(servicioIds),
-      })
-    : [];
-
-  // CREAR CITA
-  const cita = this.citaRepository.create({
+    const servicios = servicioIds?.length
+      ? await this.servicioRepository.findBy({ idServicio: In(servicioIds) })
+      : [];
+    const cita = this.citaRepository.create({
     ...rest,
     fecha_hora,
     mascota: { idMascota: mascotaId } as any,
     usuario: { id: usuarioId } as any,
+    veterinario: { id: veterinarioId } as any,
     servicios,
-  });
-
-  await this.citaRepository.save(cita);
-
-  return {
-    message: 'Cita agendada correctamente',
-    cita,
-  };
-}
+    });
+    await this.citaRepository.save(cita);
+    return { message: 'Cita creada correctamente', cita };
+  }
 
   async findAll() {
     return this.citaRepository.find({ relations: ['mascota', 'usuario', 'servicios'] });
