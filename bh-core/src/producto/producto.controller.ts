@@ -20,6 +20,20 @@ export class ProductoController {
     return this.productoService.create(createProductoDto);
   }
 
+  @Get('low-stock')
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(RolUsuario.ADMINISTRADOR)
+  findLowStock() {
+    return this.productoService.findLowStock();
+  }
+
+  @Get('near-expiration')
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(RolUsuario.ADMINISTRADOR)
+  findNearExpiration(@Query() query: ListNearExpirationProductsDto) {
+    return this.productoService.findNearExpiration(query.dias ?? 30);
+  }
+
   @Get()
   @UseGuards(JwtAuthGuard)
   findAll(@Query('search') search?: string) {
@@ -50,19 +64,5 @@ export class ProductoController {
     @Body() ajustarStockDto: AjustarStockDto,
   ) {
     return this.productoService.adjustStock(productId, ajustarStockDto);
-  }
-
-  @Get('low-stock')
-  @UseGuards(JwtAuthGuard, RolesGuard)
-  @Roles(RolUsuario.ADMINISTRADOR)
-  findLowStock() {
-    return this.productoService.findLowStock();
-  }
-
-  @Get('near-expiration')
-  @UseGuards(JwtAuthGuard, RolesGuard)
-  @Roles(RolUsuario.ADMINISTRADOR)
-  findNearExpiration(@Query() query: ListNearExpirationProductsDto) {
-    return this.productoService.findNearExpiration(query.dias ?? 30);
   }
 }

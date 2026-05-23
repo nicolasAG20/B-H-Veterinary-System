@@ -1,71 +1,39 @@
-import {
-  ArrayMinSize,
-  IsArray,
-  IsDateString,
-  IsInt,
-  IsNotEmpty,
-  IsNumber,
-  IsPositive,
-  IsString,
-  MaxLength,
-  Min,
-  ValidateNested,
-} from 'class-validator';
-
+import { IsArray, IsDateString, IsInt, IsNumber, IsOptional, IsPositive, IsString, ValidateNested } from 'class-validator';
 import { Type } from 'class-transformer';
 
-export class MedicamentoPrescritoDto {
+class MedicamentoPrescritoDto {
   @IsString()
-  @IsNotEmpty({
-    message: 'El nombre del medicamento es obligatorio',
-  })
-  @MaxLength(50)
-  nombre_medicamento: string;
+  nombre: string;
 
   @IsString()
-  @IsNotEmpty({
-    message: 'La dosis es obligatoria',
-  })
   dosis: string;
 
   @IsString()
-  @IsNotEmpty({
-    message: 'La duración es obligatoria',
-  })
   duracion: string;
 }
 
 export class CreateHistorialMedicoDto {
   @IsString()
-  @IsNotEmpty({
-    message: 'El motivo de la visita es obligatorio',
-  })
   motivo_visita: string;
 
   @IsString()
-  @IsNotEmpty({
-    message: 'El diagnóstico es obligatorio',
-  })
   diagnostico: string;
 
   @IsString()
-  @IsNotEmpty({
-    message: 'El tratamiento es obligatorio',
-  })
-  tratamiento: string;
+  @IsOptional()
+  tratamiento?: string;
 
   @IsNumber()
-  @IsPositive({
-    message: 'El peso debe ser mayor a 0',
-  })
-  @Min(0.1)
+  @IsPositive()
   peso_mascota: number;
 
   @IsDateString()
-  @IsNotEmpty({
-    message: 'La próxima visita es obligatoria',
-  })
-  proxima_visita: string;
+  @IsOptional()
+  proxima_visita?: string;
+
+  @IsDateString()
+  @IsOptional()
+  fecha_creacion?: string;
 
   @IsInt()
   @IsPositive()
@@ -76,9 +44,6 @@ export class CreateHistorialMedicoDto {
   usuarioId: number;
 
   @IsArray()
-  @ArrayMinSize(1, {
-    message: 'Debe registrar al menos un medicamento',
-  })
   @ValidateNested({ each: true })
   @Type(() => MedicamentoPrescritoDto)
   medicamentos_prescritos: MedicamentoPrescritoDto[];

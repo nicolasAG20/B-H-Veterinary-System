@@ -31,9 +31,6 @@ export class HistorialMedicoService {
     private readonly medicamentoRepository: Repository<Medicamento>,
   ) {}
 
-  /**
-   * Registrar historial médico al finalizar una cita.
-   */
   async create(createDto: CreateHistorialMedicoDto) {
     const {
       citaId,
@@ -42,36 +39,24 @@ export class HistorialMedicoService {
       ...historialData
     } = createDto;
 
-    /**
-     * Buscar cita
-     */
     const cita = await this.citaRepository.findOne({
       where: {
         idCita: citaId,
       },
     });
 
-    /**
-     * Validar existencia
-     */
     if (!cita) {
       throw new NotFoundException(
         `La cita #${citaId} no existe`,
       );
     }
 
-    /**
-     * Validar estado finalizado
-     */
     if (cita.estado !== EstadoCita.FINALIZADA) {
       throw new BadRequestException(
         'No se puede registrar el historial médico porque la cita aún no ha finalizado',
       );
     }
 
-    /**
-     * Validar historial existente
-     */
     const historialExistente =
       await this.historialRepository.findOne({
         where: {
@@ -86,10 +71,7 @@ export class HistorialMedicoService {
         'La cita ya tiene un historial médico registrado',
       );
     }
-
-    /**
-     * Crear historial
-     */
+    
     const historial =
       this.historialRepository.create({
         ...historialData,
@@ -105,23 +87,16 @@ export class HistorialMedicoService {
         } as any,
       });
 
-    /**
-     * Guardar historial
-     */
     const historialGuardado =
       await this.historialRepository.save(
         historial,
       );
 
-    /**
-     * Registrar medicamentos
-     */
     const medicamentos =
       medicamentos_prescritos.map(
         (medicamento) =>
           this.medicamentoRepository.create({
-            nombre_medicamento:
-              medicamento.nombre_medicamento,
+            nombre: medicamento.nombre,
 
             dosis: medicamento.dosis,
 
