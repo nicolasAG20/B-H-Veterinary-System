@@ -13,6 +13,7 @@ import { Servicio } from '../servicio/entities/servicio.entity';
 import { Factura, EstadoFactura } from '../factura/entities/factura.entity';
 
 import { CreateCitaDto } from './dto/create-cita.dto';
+import { CancelarCitaDto } from './dto/cancelar-cita.dto';
 import { UpdateCitaDto } from './dto/update-cita.dto';
 import { EstimateCitaDto } from './dto/estimate-cita.dto';
 
@@ -307,32 +308,37 @@ export class CitaService {
 
     return servicios;
   }
-    async cancelar(id: number) {
+    async cancelar(
+      id: number,
+      cancelarCitaDto: CancelarCitaDto,
+    ) {
 
-  // Buscar la cita por el ID
-  // Si no existe, automáticamente lanza error
-  const cita = await this.findOne(id);
+    // Busca la cita en la base de datos
+    const cita = await this.findOne(id);
 
-  // Validar si la cita ya fue atendida
-  // Si el estado es FINALIZADA no se puede cancelar
-  if (cita.estado === EstadoCita.FINALIZADA) {
+    // Verifica si ya fue atendida
+    if (cita.estado === EstadoCita.FINALIZADA) {
 
-    throw new NotFoundException(
+    // Lanza error si ya está finalizada
+    throw new BadRequestException(
       'No se puede cancelar una cita ya atendida',
-    );
+     );
+    }
+
+    // Cambia el estado a cancelada
+    cita.estado = EstadoCita.CANCELADA;
+
+    // Guarda el motivo de cancelación
+    cita.motivo_cancelacion =
+    cancelarCitaDto.motivo_cancelacion;
+
+    // Guarda los cambios en la base de datos
+    await this.citaRepository.save(cita);
+
+    // Retorna respuesta exitosa
+    return {
+      message: 'Cita cancelada correctamente',
+      cita,
+    };
   }
-
-  // Cambiar el estado de la cita
-  // La cita pasa de AGENDADA a CANCELADA
-  cita.estado = EstadoCita.CANCELADA;
-
-  // Guardar los cambios en la base de datos
-  await this.citaRepository.save(cita);
-
-  // Respuesta exitosa
-  return {
-    message: 'Cita cancelada correctamente',
-    cita,
-  };
-}
 }
