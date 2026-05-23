@@ -22,6 +22,7 @@ import {
 } from './interfaces/estimate-cita.interface';
 import { IResultadoVerificacionPago } from './interfaces/pago.interface';
 
+
 /**
  * Servicio de gestión de citas veterinarias.
  *
@@ -306,4 +307,32 @@ export class CitaService {
 
     return servicios;
   }
+    async cancelar(id: number) {
+
+  // Buscar la cita por el ID
+  // Si no existe, automáticamente lanza error
+  const cita = await this.findOne(id);
+
+  // Validar si la cita ya fue atendida
+  // Si el estado es FINALIZADA no se puede cancelar
+  if (cita.estado === EstadoCita.FINALIZADA) {
+
+    throw new NotFoundException(
+      'No se puede cancelar una cita ya atendida',
+    );
+  }
+
+  // Cambiar el estado de la cita
+  // La cita pasa de AGENDADA a CANCELADA
+  cita.estado = EstadoCita.CANCELADA;
+
+  // Guardar los cambios en la base de datos
+  await this.citaRepository.save(cita);
+
+  // Respuesta exitosa
+  return {
+    message: 'Cita cancelada correctamente',
+    cita,
+  };
+}
 }
