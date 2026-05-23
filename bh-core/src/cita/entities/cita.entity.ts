@@ -46,6 +46,10 @@ export class Cita {
   @JoinColumn({ name: 'Usuario_id' })
   usuario: Usuario;
 
+  @ManyToOne(() => Usuario)
+  @JoinColumn({ name: 'Veterinario_id' })
+  veterinario: Usuario;
+
   @ManyToMany(() => Servicio, (servicio) => servicio.citas)
   @JoinTable({
     name: 'Cita_servicio',
