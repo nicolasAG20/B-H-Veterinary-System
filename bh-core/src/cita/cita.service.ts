@@ -15,20 +15,46 @@ export class CitaService {
     private readonly servicioRepository: Repository<Servicio>,
   ) {}
 
-  async create(createCitaDto: CreateCitaDto) {
-    const { mascotaId, usuarioId, servicioIds, ...rest } = createCitaDto;
-    const servicios = servicioIds?.length
-      ? await this.servicioRepository.findBy({ idServicio: In(servicioIds) })
-      : [];
-    const cita = this.citaRepository.create({
-      ...rest,
-      mascota: { idMascota: mascotaId } as any,
-      usuario: { id: usuarioId } as any,
-      servicios,
-    });
-    await this.citaRepository.save(cita);
-    return { message: 'Cita creada correctamente', cita };
+async create(createCitaDto: CreateCitaDto) {
+
+  const { mascotaId, usuarioId, servicioIds, fecha_hora, ...rest } = createCitaDto;
+
+  // VALIDAR SI YA EXISTE UNA CITA EN ESA FECHA
+  const citaExistente = await this.citaRepository.findOne({
+    where: {
+      fecha_hora: new Date(fecha_hora),
+    },
+  });
+
+  if (citaExistente) {
+    throw new NotFoundException(
+      'La fecha y hora seleccionadas no están disponibles',
+    );
   }
+
+  // BUSCAR SERVICIOS
+  const servicios = servicioIds?.length
+    ? await this.servicioRepository.findBy({
+        idServicio: In(servicioIds),
+      })
+    : [];
+
+  // CREAR CITA
+  const cita = this.citaRepository.create({
+    ...rest,
+    fecha_hora,
+    mascota: { idMascota: mascotaId } as any,
+    usuario: { id: usuarioId } as any,
+    servicios,
+  });
+
+  await this.citaRepository.save(cita);
+
+  return {
+    message: 'Cita agendada correctamente',
+    cita,
+  };
+}
 
   async findAll() {
     return this.citaRepository.find({ relations: ['mascota', 'usuario', 'servicios'] });

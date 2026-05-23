@@ -2,10 +2,14 @@ import { IsArray, IsDateString, IsEnum, IsInt, IsOptional, IsPositive, IsString 
 import { EstadoCita } from '../entities/cita.entity';
 
 export class CreateCitaDto {
-  @IsDateString()
+  @IsDateString({}, {
+  message: 'La fecha y hora son obligatorias',
+})
   fecha_hora: string;
 
-  @IsEnum(EstadoCita)
+  @IsEnum(EstadoCita, {
+  message: 'Estado inválido',
+})
   estado: EstadoCita;
 
   @IsInt()
@@ -16,11 +20,15 @@ export class CreateCitaDto {
   @IsOptional()
   motivo_cancelacion?: string;
 
-  @IsInt()
+   @IsInt({
+    message: 'La mascota es obligatoria',
+  })
   @IsPositive()
   mascotaId: number;
-
-  @IsInt()
+  
+  @IsInt({
+  message: 'El usuario es obligatorio',
+})
   @IsPositive()
   usuarioId: number;
 
