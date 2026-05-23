@@ -11,6 +11,7 @@ import {
 
 import { CitaService } from './cita.service';
 import { CreateCitaDto } from './dto/create-cita.dto';
+import { CancelarCitaDto } from './dto/cancelar-cita.dto';
 import { UpdateCitaDto } from './dto/update-cita.dto';
 import { EstimateCitaDto } from './dto/estimate-cita.dto';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
@@ -87,13 +88,19 @@ export class CitaController {
     return this.citaService.update(+id, updateCitaDto);
   }
   @Patch(':id/cancelar')
-  // ENDPOINT para cancelar citas
-  // Recibe el id de la cita por parametro
 
-  cancelar(@Param('id') id: string) {
+  // Endpoint para cancelar una cita
+  cancelar(
 
-  // Llama el metodo cancelar() del service
-  return this.citaService.cancelar(+id);
+  // Recibe el id de la cita
+  @Param('id') id: string,
+
+  // Recibe el body con el motivo
+  @Body() cancelarCitaDto: CancelarCitaDto,
+  ) {
+
+  // Envía el id y el motivo al service
+  return this.citaService.cancelar(+id, cancelarCitaDto);
   }
   /**
    * Elimina una cita del sistema.
