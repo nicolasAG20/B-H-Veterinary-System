@@ -14,15 +14,20 @@ import { Factura, EstadoFactura } from '../factura/entities/factura.entity';
 
 import { CreateCitaDto } from './dto/create-cita.dto';
 import { UpdateCitaDto } from './dto/update-cita.dto';
+import { EstimateCitaDto } from './dto/estimate-cita.dto';
 
+import {
+  DetalleServicio,
+  EstimateCitaResponse,
+} from './interfaces/estimate-cita.interface';
 import { IResultadoVerificacionPago } from './interfaces/pago.interface';
 
 /**
  * Servicio de gestión de citas veterinarias.
  *
  * Contiene toda la lógica de negocio relacionada con el ciclo de vida
- * de una cita: verificación de pago, creación, consulta, actualización
- * y eliminación. También centraliza la validación de servicios activos.
+ * de una cita: estimación de costos, verificación de pago, creación,
+ * consulta, actualización y eliminación.
  */
 @Injectable()
 export class CitaService {
@@ -36,6 +41,34 @@ export class CitaService {
     @InjectRepository(Factura)
     private readonly facturaRepository: Repository<Factura>,
   ) {}
+
+  /**
+   * Calcula el costo estimado de una cita a partir de los servicios seleccionados,
+   * sin confirmar ni persistir ningún dato.
+   *
+   * @param dto - DTO con los IDs de los servicios a estimar.
+   * @returns Total calculado y detalle de precios por servicio.
+   * @throws BadRequestException si algún servicio no existe.
+   * @throws ConflictException si algún servicio está inactivo.
+   */
+  async estimateCost(
+    dto: EstimateCitaDto,
+  ): Promise<EstimateCitaResponse> {
+    const servicios = await this.findServiciosActivosOrFail(dto.servicios);
+
+    const detalles: DetalleServicio[] = servicios.map((servicio) => ({
+      servicioId: servicio.idServicio,
+      nombre: servicio.nombre,
+      precio: servicio.precio,
+    }));
+
+    const total = detalles.reduce(
+      (acumulado, detalle) => acumulado + detalle.precio,
+      0,
+    );
+
+    return { total, detalles };
+  }
 
   /**
    * Registra una nueva cita en el sistema y confirma el agendamiento
@@ -221,7 +254,6 @@ export class CitaService {
 
   /**
    * Verifica que el monto recibido cubra el total requerido.
-   * Si el pago es insuficiente, lanza una excepción con el detalle del faltante.
    *
    * @param resultado - Resultado de la comparación entre monto recibido y total requerido.
    * @throws BadRequestException si el monto recibido es menor al total requerido.

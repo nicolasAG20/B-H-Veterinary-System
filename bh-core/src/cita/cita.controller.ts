@@ -12,6 +12,7 @@ import {
 import { CitaService } from './cita.service';
 import { CreateCitaDto } from './dto/create-cita.dto';
 import { UpdateCitaDto } from './dto/update-cita.dto';
+import { EstimateCitaDto } from './dto/estimate-cita.dto';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 
 /**
@@ -26,12 +27,24 @@ export class CitaController {
   constructor(private readonly citaService: CitaService) {}
 
   /**
+   * Estima el costo total de una cita a partir de los servicios seleccionados,
+   * sin confirmar ni registrar la cita. Permite conocer el valor a pagar antes
+   * de proceder con el agendamiento.
+   *
+   * @param estimateCitaDto - IDs de los servicios a incluir en la estimación.
+   * @returns Total calculado y detalle de precios por servicio.
+   */
+  @Post('estimate')
+  estimateCost(@Body() estimateCitaDto: EstimateCitaDto) {
+    return this.citaService.estimateCost(estimateCitaDto);
+  }
+
+  /**
    * Agenda una nueva cita veterinaria con verificación de pago obligatoria.
    *
    * El sistema calcula el total a partir de los servicios seleccionados
    * y verifica que el monto pagado sea suficiente antes de confirmar el
-   * agendamiento. Si el pago es aprobado, la cita queda en estado `AGENDADA`
-   * y se envía un correo de confirmación al cliente.
+   * agendamiento. Si el pago es aprobado, la cita queda en estado `AGENDADA`.
    *
    * @param createCitaDto - Datos de la cita incluyendo servicios y pago.
    * @returns Mensaje de confirmación y la cita creada.

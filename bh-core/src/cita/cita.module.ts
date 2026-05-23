@@ -11,7 +11,8 @@ import { CitaController } from './cita.controller';
  * Módulo de gestión de citas veterinarias.
  *
  * Encapsula toda la lógica relacionada con el ciclo de vida de una cita:
- * verificación de pago, agendamiento, consulta, actualización y eliminación.
+ * estimación de costos, verificación de pago, agendamiento, consulta,
+ * actualización y eliminación.
  *
  * Exporta `CitaService` y `TypeOrmModule` para que otros módulos
  * puedan acceder a la entidad `Cita` y su servicio si lo requieren.
