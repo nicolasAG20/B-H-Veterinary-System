@@ -7,6 +7,7 @@ import { HistorialMedicoController } from './historial-medico.controller';
 import { HistorialMedico } from './entities/historial-medico.entity';
 import { Cita } from '../cita/entities/cita.entity';
 import { Medicamento } from '../medicamento/entities/medicamento.entity';
+import { Mascota } from '../mascota/entities/mascota.entity';
 
 @Module({
   imports: [
@@ -14,10 +15,10 @@ import { Medicamento } from '../medicamento/entities/medicamento.entity';
       HistorialMedico,
       Cita,
       Medicamento,
+      Mascota,
     ]),
   ],
   controllers: [HistorialMedicoController],
   providers: [HistorialMedicoService],
-  exports: [HistorialMedicoService],
 })
 export class HistorialMedicoModule {}
