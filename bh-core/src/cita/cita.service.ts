@@ -11,6 +11,7 @@ import { In, Repository } from 'typeorm';
 import { Cita, EstadoCita } from './entities/cita.entity';
 import { Servicio } from '../servicio/entities/servicio.entity';
 import { Factura, EstadoFactura } from '../factura/entities/factura.entity';
+import { Reembolso, EstadoReembolso } from '../reembolso/entities/reembolso.entity';
 
 import { CreateCitaDto } from './dto/create-cita.dto';
 import { CancelarCitaDto } from './dto/cancelar-cita.dto';
@@ -42,6 +43,9 @@ export class CitaService {
 
     @InjectRepository(Factura)
     private readonly facturaRepository: Repository<Factura>,
+
+    @InjectRepository(Reembolso)
+    private readonly reembolsoRepository: Repository<Reembolso>,
   ) {}
 
   /**
@@ -334,6 +338,21 @@ export class CitaService {
 
     // Guarda los cambios en la base de datos
     await this.citaRepository.save(cita);
+
+    // Si la cita tenía una factura pagada, genera un reembolso en estado
+    // PENDIENTE para que el administrador decida si aplica devolución.
+    const factura = await this.facturaRepository.findOne({
+      where: { cita: { idCita: id }, estado: EstadoFactura.PAGADA },
+    });
+
+    if (factura) {
+      await this.reembolsoRepository.save(
+        this.reembolsoRepository.create({
+          estado: EstadoReembolso.PENDIENTE,
+          factura: { idFactura: factura.idFactura } as any,
+        }),
+      );
+    }
 
     // Retorna respuesta exitosa
     return {

@@ -4,6 +4,7 @@ import { TypeOrmModule } from '@nestjs/typeorm';
 import { Cita } from './entities/cita.entity';
 import { Servicio } from '../servicio/entities/servicio.entity';
 import { Factura } from '../factura/entities/factura.entity';
+import { Reembolso } from '../reembolso/entities/reembolso.entity';
 import { CitaService } from './cita.service';
 import { CitaController } from './cita.controller';
 
@@ -18,7 +19,7 @@ import { CitaController } from './cita.controller';
  * puedan acceder a la entidad `Cita` y su servicio si lo requieren.
  */
 @Module({
-  imports: [TypeOrmModule.forFeature([Cita, Servicio, Factura])],
+  imports: [TypeOrmModule.forFeature([Cita, Servicio, Factura, Reembolso])],
   controllers: [CitaController],
   providers: [CitaService],
   exports: [CitaService, TypeOrmModule],
