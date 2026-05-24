@@ -22,7 +22,7 @@ class CrearMedicamentoRequestDto {
 
   @IsString()
   @IsNotEmpty()
-  nombre_medicamento: string;
+  nombre: string;
 
   @IsString()
   @IsNotEmpty()

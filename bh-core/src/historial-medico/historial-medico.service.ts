@@ -93,7 +93,7 @@ export class HistorialMedicoService {
     const medicamentosGuardados = await this.medicamentoRepository.save(
       medicamentos.map((medicamento) =>
         this.medicamentoRepository.create({
-          nombre: medicamento.nombre_medicamento,
+          nombre: medicamento.nombre,
           dosis: medicamento.dosis,
           duracion: medicamento.duracion,
           producto: { idProducto: medicamento.productoId } as any,

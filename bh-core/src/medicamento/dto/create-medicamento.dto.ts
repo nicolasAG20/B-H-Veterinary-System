@@ -2,7 +2,7 @@ import { IsInt, IsPositive, IsString } from 'class-validator';
 
 export class CreateMedicamentoDto {
   @IsString()
-  nombre_medicamento: string;
+  nombre: string;
 
   @IsString()
   dosis: string;
