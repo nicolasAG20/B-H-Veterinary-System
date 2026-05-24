@@ -3,6 +3,7 @@ import { FacturaService } from './factura.service';
 import { CreateFacturaDto } from './dto/create-factura.dto';
 import { UpdateFacturaDto } from './dto/update-factura.dto';
 import { AplicarDescuentoDto } from './dto/aplicar-descuento.dto';
+import { AnularFacturaDto } from './dto/anular-factura.dto';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { RolesGuard } from '../auth/guards/roles.guard';
 import { Roles } from '../auth/decorators/roles.decorator';
@@ -36,6 +37,16 @@ export class FacturaController {
   @Delete(':id')
   remove(@Param('id') id: string) {
     return this.facturaService.remove(+id);
+  }
+
+  @Patch(':id/cancel')
+  @UseGuards(RolesGuard)
+  @Roles(RolUsuario.RECEPCIONISTA)
+  anularFactura(
+    @Param('id') id: string,
+    @Body() anularFacturaDto: AnularFacturaDto,
+  ) {
+    return this.facturaService.anularFactura(+id, anularFacturaDto);
   }
 
   @Patch(':id/discount')

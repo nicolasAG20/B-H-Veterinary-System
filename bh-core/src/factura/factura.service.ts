@@ -1,4 +1,4 @@
-import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
+import { BadRequestException, ConflictException, Injectable, NotFoundException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { In, Repository } from 'typeorm';
 import { Factura, EstadoFactura } from './entities/factura.entity';
@@ -8,6 +8,7 @@ import { CreateFacturaDto } from './dto/create-factura.dto';
 import { UpdateFacturaDto } from './dto/update-factura.dto';
 import { GenerarFacturaDto } from './dto/generar-factura.dto';
 import { AplicarDescuentoDto } from './dto/aplicar-descuento.dto';
+import { AnularFacturaDto } from './dto/anular-factura.dto';
 
 export interface DetalleItem {
   descripcion: string;
@@ -188,6 +189,26 @@ export class FacturaService {
     };
   }
 
+  async anularFactura(id: number, dto: AnularFacturaDto) {
+    const factura = await this.facturaRepository.findOne({
+      where: { idFactura: id },
+    });
+
+    if (!factura) {
+      throw new NotFoundException(`Factura #${id} no encontrada`);
+    }
+
+    if (factura.estado === EstadoFactura.ANULADA) {
+      throw new ConflictException('La factura ya se encuentra anulada');
+    }
+
+    factura.estado = EstadoFactura.ANULADA;
+    factura.motivo_anulacion = dto.motivo_anulacion;
+
+    await this.facturaRepository.save(factura);
+    return { message: 'Factura anulada correctamente' };
+  }
+
   async aplicarDescuento(id: number, dto: AplicarDescuentoDto) {
     const factura = await this.facturaRepository.findOne({
       where: { idFactura: id },
@@ -210,7 +231,7 @@ export class FacturaService {
       );
     }
 
-    if (factura.descuento !== null && factura.descuento !== undefined) {
+    if (factura.descuento !== null && factura.descuento > 0) {
       throw new BadRequestException(
         'La factura ya tiene un descuento aplicado y no puede modificarse',
       );
