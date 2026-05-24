@@ -15,6 +15,11 @@ import { CancelarCitaDto } from './dto/cancelar-cita.dto';
 import { UpdateCitaDto } from './dto/update-cita.dto';
 import { EstimateCitaDto } from './dto/estimate-cita.dto';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
+import { RolesGuard } from '../auth/guards/roles.guard';
+import { Roles } from '../auth/decorators/roles.decorator';
+import { RolUsuario } from '../usuario/entities/usuario.entity';
+import { FacturaService } from '../factura/factura.service';
+import { GenerarFacturaDto } from '../factura/dto/generar-factura.dto';
 
 /**
  * Controlador para la gestión de citas veterinarias.
@@ -25,7 +30,10 @@ import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 @UseGuards(JwtAuthGuard)
 @Controller('appointments')
 export class CitaController {
-  constructor(private readonly citaService: CitaService) {}
+  constructor(
+    private readonly citaService: CitaService,
+    private readonly facturaService: FacturaService,
+  ) {}
 
   /**
    * Estima el costo total de una cita a partir de los servicios seleccionados,
@@ -87,21 +95,33 @@ export class CitaController {
   update(@Param('id') id: string, @Body() updateCitaDto: UpdateCitaDto) {
     return this.citaService.update(+id, updateCitaDto);
   }
+
   @Patch(':id/cancelar')
-
-  // Endpoint para cancelar una cita
   cancelar(
-
-  // Recibe el id de la cita
-  @Param('id') id: string,
-
-  // Recibe el body con el motivo
-  @Body() cancelarCitaDto: CancelarCitaDto,
+    @Param('id') id: string,
+    @Body() cancelarCitaDto: CancelarCitaDto,
   ) {
-
-  // Envía el id y el motivo al service
-  return this.citaService.cancelar(+id, cancelarCitaDto);
+    return this.citaService.cancelar(+id, cancelarCitaDto);
   }
+
+  /**
+   * Genera la factura de una cita finalizada con los servicios prestados
+   * y medicamentos despachados. Solo accesible por la recepcionista.
+   *
+   * @param id - Identificador de la cita.
+   * @param generarFacturaDto - Descuento opcional y medicamentos adicionales.
+   * @returns Factura generada con el desglose de ítems y el total.
+   */
+  @Post(':id/invoice')
+  @UseGuards(RolesGuard)
+  @Roles(RolUsuario.RECEPCIONISTA)
+  generarFactura(
+    @Param('id') id: string,
+    @Body() generarFacturaDto: GenerarFacturaDto,
+  ) {
+    return this.facturaService.generarFactura(+id, generarFacturaDto);
+  }
+
   /**
    * Elimina una cita del sistema.
    *
