@@ -17,6 +17,7 @@ import { UpdateHistorialMedicoDto } from './dto/update-historial-medico.dto';
 import { Cita, EstadoCita } from '../cita/entities/cita.entity';
 import { Medicamento } from '../medicamento/entities/medicamento.entity';
 import { Mascota } from '../mascota/entities/mascota.entity';
+import { Producto } from '../producto/entities/producto.entity';
 import { RolUsuario } from '../usuario/entities/usuario.entity';
 
 @Injectable()
@@ -90,18 +91,53 @@ export class HistorialMedicoService {
 
     const medicamentos = createDto.medicamentos ?? [];
 
-    const medicamentosGuardados = await this.medicamentoRepository.save(
-      medicamentos.map((medicamento) =>
+    // Se inicializa un arreglo para almacenar los medicamentos registrados
+    // después de validar el inventario y descontar el stock correspondiente.
+    const medicamentosGuardados: Medicamento[] = [];
+
+    for (const medicamento of medicamentos) {
+
+      // Se busca el producto en inventario utilizando el productoId
+      // enviado en la prescripción médica.
+      const producto = await this.dataSource.getRepository(Producto).findOne({
+        where: { idProducto: medicamento.productoId },
+      });
+
+      // Validación: el medicamento debe existir en el inventario.
+      if (!producto) {
+        throw new NotFoundException(
+          `El medicamento con productoId ${medicamento.productoId} no está registrado en el inventario.`,
+        );
+      }
+
+      // Validación: debe existir stock disponible antes de registrar
+      // el medicamento en el historial médico.
+      if (producto.stock < 1) {
+        throw new BadRequestException(
+          `No hay disponibilidad suficiente para el medicamento ${producto.nombre}.`,
+        );
+      }
+
+      // Se descuenta automáticamente una unidad del inventario
+      // al prescribir el medicamento.
+      producto.stock -= 1;
+
+      // Se actualiza el stock del producto en la base de datos.
+      await this.dataSource.getRepository(Producto).save(producto);
+
+       // Se registra el medicamento asociado al historial médico.
+      const medicamentoGuardado = await this.medicamentoRepository.save(
         this.medicamentoRepository.create({
           nombre: medicamento.nombre,
           dosis: medicamento.dosis,
           duracion: medicamento.duracion,
-          producto: { idProducto: medicamento.productoId } as any,
+          producto,
           historialMedico: historialGuardado,
         }),
-      ),
-    );
+      );
 
+      medicamentosGuardados.push(medicamentoGuardado);
+    }
     return {
       message: 'Historial médico registrado exitosamente.',
       historial: {
