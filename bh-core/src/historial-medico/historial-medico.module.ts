@@ -9,6 +9,7 @@ import { Cita } from '../cita/entities/cita.entity';
 import { Medicamento } from '../medicamento/entities/medicamento.entity';
 import { Producto } from '../producto/entities/producto.entity';
 import { Mascota } from '../mascota/entities/mascota.entity';
+import { Vacunacion } from '../vacunacion/entities/vacunacion.entity';
 
 @Module({
   imports: [
@@ -22,6 +23,9 @@ import { Mascota } from '../mascota/entities/mascota.entity';
       // pueda inyectar su repositorio y descontar automáticamente el stock
       // de los medicamentos prescritos, validando existencia y stock disponible.
       Producto,
+
+       // Se registra Vacunacion para guardar vacunas desde el historial medico.
+      Vacunacion,
     ]),
   ],
   controllers: [HistorialMedicoController],
