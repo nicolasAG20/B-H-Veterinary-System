@@ -7,22 +7,27 @@ import {
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 
-import { Hospitalizacion } from './entities/hospitalizacion.entity';
+import { Hospitalizacion, EstadoEgreso } from './entities/hospitalizacion.entity';
 import { Mascota, EstadoMascota } from '../mascota/entities/mascota.entity';
 
 import { CreateHospitalizacionDto } from './dto/create-hospitalizacion.dto';
 import { UpdateHospitalizacionDto } from './dto/update-hospitalizacion.dto';
+import { DarAltaDto } from './dto/dar-alta.dto';
 
-import { IResultadoInternacion } from './interfaces/hospitalizacion.interface';
+import {
+  IResultadoInternacion,
+  IResultadoAlta,
+} from './interfaces/hospitalizacion.interface';
 
 /**
  * Servicio de gestión de hospitalizaciones veterinarias.
  *
  * Contiene toda la lógica de negocio relacionada con el ciclo de vida
- * de una hospitalización: internación, consulta, actualización y eliminación.
+ * de una hospitalización: internación, consulta, alta y eliminación.
  *
- * Al internar una mascota, el sistema valida que exista y que no esté
- * ya hospitalizada, y actualiza su estado automáticamente.
+ * Al internar una mascota, valida su existencia y estado.
+ * Al dar de alta, valida que la hospitalización esté activa y
+ * actualiza el estado de la mascota según el estado de egreso.
  */
 @Injectable()
 export class HospitalizacionService {
@@ -52,7 +57,6 @@ export class HospitalizacionService {
     const { mascotaId, veterinarioId, ...rest } = dto;
 
     const mascota = await this.findMascotaOrFail(mascotaId);
-
     this.validarMascotaNoHospitalizada(mascota);
 
     const hospitalizacion = this.hospitalizacionRepository.create({
@@ -100,6 +104,44 @@ export class HospitalizacionService {
     }
 
     return hospitalizacion;
+  }
+
+  /**
+   * Registra el alta de una mascota hospitalizada.
+   *
+   * Flujo:
+   * 1. Verifica que la hospitalización exista.
+   * 2. Verifica que no haya sido dada de alta previamente.
+   * 3. Registra la fecha de salida y el estado de egreso.
+   * 4. Actualiza el estado de la mascota según el egreso.
+   *
+   * @param id - Identificador de la hospitalización a cerrar.
+   * @param dto - Fecha de salida y estado de egreso.
+   * @returns Mensaje de confirmación y la hospitalización actualizada.
+   * @throws NotFoundException si la hospitalización no existe.
+   * @throws ConflictException si la hospitalización ya fue dada de alta.
+   */
+  async discharge(id: number, dto: DarAltaDto): Promise<IResultadoAlta> {
+    const hospitalizacion = await this.findOne(id);
+
+    this.validarNoDadaDeAlta(hospitalizacion);
+
+    await this.hospitalizacionRepository.update(id, {
+      fecha_salida: new Date(dto.fecha_salida),
+      estado_egreso: dto.estado_egreso,
+    });
+
+    await this.actualizarEstadoMascota(
+      hospitalizacion.mascota.idMascota,
+      this.resolverEstadoMascotaPostAlta(dto.estado_egreso),
+    );
+
+    const hospitalizacionActualizada = await this.findOne(id);
+
+    return {
+      message: 'Alta registrada exitosamente',
+      hospitalizacion: hospitalizacionActualizada,
+    };
   }
 
   /**
@@ -180,6 +222,40 @@ export class HospitalizacionService {
         `La mascota "${mascota.nombre}" ya se encuentra hospitalizada`,
       );
     }
+  }
+
+  /**
+   * Verifica que la hospitalización no haya sido dada de alta previamente.
+   *
+   * @param hospitalizacion - Entidad `Hospitalizacion` a validar.
+   * @throws ConflictException si la hospitalización ya tiene fecha de salida registrada.
+   */
+  private validarNoDadaDeAlta(hospitalizacion: Hospitalizacion): void {
+    if (hospitalizacion.fecha_salida !== null) {
+      throw new ConflictException(
+        `La hospitalización #${hospitalizacion.idHospitalizacion} ya fue dada de alta`,
+      );
+    }
+  }
+
+  /**
+   * Determina el nuevo estado de la mascota según el estado de egreso registrado.
+   *
+   * - `RECUPERADA` → `ACTIVA`
+   * - `TRASLADADA`  → `ACTIVA`
+   * - `FALLECIDA`   → `FALLECIDA`
+   *
+   * @param estadoEgreso - Estado en que egresa la mascota.
+   * @returns Nuevo estado a asignar a la mascota.
+   */
+  private resolverEstadoMascotaPostAlta(estadoEgreso: EstadoEgreso): EstadoMascota {
+    const mapa: Record<EstadoEgreso, EstadoMascota> = {
+      [EstadoEgreso.RECUPERADA]: EstadoMascota.ACTIVA,
+      [EstadoEgreso.TRASLADADA]: EstadoMascota.ACTIVA,
+      [EstadoEgreso.FALLECIDA]:  EstadoMascota.FALLECIDA,
+    };
+
+    return mapa[estadoEgreso];
   }
 
   /**

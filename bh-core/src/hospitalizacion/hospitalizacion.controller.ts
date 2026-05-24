@@ -12,6 +12,7 @@ import {
 import { HospitalizacionService } from './hospitalizacion.service';
 import { CreateHospitalizacionDto } from './dto/create-hospitalizacion.dto';
 import { UpdateHospitalizacionDto } from './dto/update-hospitalizacion.dto';
+import { DarAltaDto } from './dto/dar-alta.dto';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 
 /**
@@ -59,6 +60,24 @@ export class HospitalizacionController {
   @Get(':id')
   findOne(@Param('id') id: string) {
     return this.hospitalizacionService.findOne(+id);
+  }
+
+  /**
+   * Registra el alta de una mascota hospitalizada.
+   *
+   * El sistema valida que la hospitalización exista y que no haya sido
+   * dada de alta previamente. Al confirmar el alta, actualiza el estado
+   * de la mascota según el estado de egreso:
+   * - `RECUPERADA` o `TRASLADADA` → estado mascota: `ACTIVA`
+   * - `FALLECIDA` → estado mascota: `FALLECIDA`
+   *
+   * @param id - Identificador de la hospitalización a cerrar.
+   * @param dto - Fecha de salida y estado de egreso (ambos obligatorios).
+   * @returns Mensaje de confirmación y la hospitalización actualizada.
+   */
+  @Patch(':id/discharge')
+  discharge(@Param('id') id: string, @Body() dto: DarAltaDto) {
+    return this.hospitalizacionService.discharge(+id, dto);
   }
 
   /**
