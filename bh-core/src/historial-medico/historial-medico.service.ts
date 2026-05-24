@@ -89,6 +89,11 @@ export class HistorialMedicoService {
 
     const historialGuardado = await this.historialRepository.save(historial);
 
+    /**
+     * se actualiza el peso actual de la mascota con el valor registrado
+     * durante la atención medica, manteniendo sincronizado el historial
+     * clinico con la información general de la mascota
+     */
     await this.mascotaRepository.update(cita.mascota.idMascota, {
       peso: createDto.peso_mascota,
     });
