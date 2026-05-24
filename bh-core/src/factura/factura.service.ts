@@ -7,6 +7,7 @@ import { Producto } from '../producto/entities/producto.entity';
 import { CreateFacturaDto } from './dto/create-factura.dto';
 import { UpdateFacturaDto } from './dto/update-factura.dto';
 import { GenerarFacturaDto } from './dto/generar-factura.dto';
+import { AplicarDescuentoDto } from './dto/aplicar-descuento.dto';
 
 export interface DetalleItem {
   descripcion: string;
@@ -185,6 +186,45 @@ export class FacturaService {
       citaId,
       detalles,
     };
+  }
+
+  async aplicarDescuento(id: number, dto: AplicarDescuentoDto) {
+    const factura = await this.facturaRepository.findOne({
+      where: { idFactura: id },
+      relations: [
+        'cita',
+        'cita.servicios',
+        'cita.historiales',
+        'cita.historiales.medicamentos',
+        'cita.historiales.medicamentos.producto',
+      ],
+    });
+
+    if (!factura) {
+      throw new NotFoundException(`Factura #${id} no encontrada`);
+    }
+
+    if (factura.estado !== EstadoFactura.PENDIENTE) {
+      throw new BadRequestException(
+        'Solo se puede aplicar descuento a facturas en estado PENDIENTE',
+      );
+    }
+
+    if (factura.descuento !== null && factura.descuento !== undefined) {
+      throw new BadRequestException(
+        'La factura ya tiene un descuento aplicado y no puede modificarse',
+      );
+    }
+
+    const montoDescuento = Number(
+      ((factura.subtotal * dto.porcentaje_descuento) / 100).toFixed(2),
+    );
+
+    factura.descuento = montoDescuento;
+    factura.total = Number((factura.subtotal - montoDescuento).toFixed(2));
+
+    await this.facturaRepository.save(factura);
+    return this.buildFacturaResponse(factura);
   }
 
   // ─────────────────────────────────────────────

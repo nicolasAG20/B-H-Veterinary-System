@@ -94,13 +94,4 @@ export class CreateHistorialMedicoDto {
   @Type(() => CrearVacunacionRequestDto)
   @IsOptional()
   vacunaciones?: CrearVacunacionRequestDto[];
-  
-  /**
-   * peso actual de la mascota registrado durante la atención
-   * Debe ser un número positivo para evitar valores vacíos, negativos o cero
-   */
-  @IsNumber()
-  @IsPositive()
-  peso_mascota: number;
-  
 }
