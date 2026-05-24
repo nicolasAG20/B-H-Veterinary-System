@@ -1823,6 +1823,139 @@ paths:
           description: Factura no encontrada.
 
   # ============================================================
+  # REEMBOLSOS
+  # ============================================================
+  /reembolsos:
+    get:
+      tags:
+        - Reembolsos
+      summary: Listar reembolsos
+      description: >
+        Retorna el listado de todos los reembolsos registrados en el sistema.
+        Solo accesible por el administrador. Cada reembolso se genera
+        automáticamente cuando se cancela una cita con factura pagada.
+      operationId: listReembolsos
+      responses:
+        "200":
+          description: Listado obtenido exitosamente.
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Reembolso'
+        "401":
+          description: No autenticado.
+        "403":
+          description: No tiene permisos. Solo el administrador puede acceder.
+
+  /reembolsos/{reembolsoId}:
+    get:
+      tags:
+        - Reembolsos
+      summary: Obtener un reembolso
+      description: Retorna los detalles de un reembolso específico.
+      operationId: getReembolsoById
+      parameters:
+        - name: reembolsoId
+          in: path
+          required: true
+          schema:
+            type: integer
+          example: 1
+      responses:
+        "200":
+          description: Reembolso obtenido exitosamente.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Reembolso'
+        "401":
+          description: No autenticado.
+        "403":
+          description: No tiene permisos. Solo el administrador puede acceder.
+        "404":
+          description: Reembolso no encontrado.
+
+  /reembolsos/{reembolsoId}/aprobar:
+    patch:
+      tags:
+        - Reembolsos
+      summary: Aprobar un reembolso
+      description: >
+        El administrador aprueba el reembolso de una cita cancelada e indica el
+        monto a reembolsar, que puede ser parcial. Solo puede aprobarse si el
+        reembolso está en estado PENDIENTE.
+      operationId: aprobarReembolso
+      parameters:
+        - name: reembolsoId
+          in: path
+          required: true
+          schema:
+            type: integer
+          example: 1
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AprobarReembolsoRequest'
+      responses:
+        "200":
+          description: Reembolso aprobado correctamente.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MensajeResponse'
+        "400":
+          description: El reembolso ya fue procesado o los datos son inválidos.
+        "401":
+          description: No autenticado.
+        "403":
+          description: No tiene permisos. Solo el administrador puede acceder.
+        "404":
+          description: Reembolso no encontrado.
+
+  /reembolsos/{reembolsoId}/rechazar:
+    patch:
+      tags:
+        - Reembolsos
+      summary: Rechazar un reembolso
+      description: >
+        El administrador rechaza el reembolso de una cita cancelada y registra
+        el motivo del rechazo. Solo puede rechazarse si el reembolso está en
+        estado PENDIENTE.
+      operationId: rechazarReembolso
+      parameters:
+        - name: reembolsoId
+          in: path
+          required: true
+          schema:
+            type: integer
+          example: 1
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RechazarReembolsoRequest'
+      responses:
+        "200":
+          description: Reembolso rechazado correctamente.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MensajeResponse'
+        "400":
+          description: El reembolso ya fue procesado o los datos son inválidos.
+        "401":
+          description: No autenticado.
+        "403":
+          description: No tiene permisos. Solo el administrador puede acceder.
+        "404":
+          description: Reembolso no encontrado.
+
+  # ============================================================
   # REPORTES EN PDF
   # ============================================================
   /reports/appointments:
@@ -3091,6 +3224,66 @@ components:
           example: >
             Error en los servicios facturados; se reemite con valores
             corregidos.
+
+    # ----------------------------------------------------------
+    # SCHEMAS - REEMBOLSOS
+    # ----------------------------------------------------------
+    Reembolso:
+      type: object
+      properties:
+        idReembolso:
+          type: integer
+          example: 1
+        estado:
+          type: string
+          enum:
+            - PENDIENTE
+            - APROBADO
+            - RECHAZADO
+          example: PENDIENTE
+        monto_aprobado:
+          type: integer
+          nullable: true
+          example: 80000
+        motivo_rechazo:
+          type: string
+          nullable: true
+          example: "El pago no fue completado correctamente."
+        fecha_solicitud:
+          type: string
+          format: date-time
+          example: "2026-06-21T10:00:00"
+        fecha_resolucion:
+          type: string
+          format: date-time
+          nullable: true
+          example: "2026-06-22T09:30:00"
+        facturaId:
+          type: integer
+          example: 105
+
+    # ----------------------------------------------------------
+    # REQUESTS - REEMBOLSOS
+    # ----------------------------------------------------------
+    AprobarReembolsoRequest:
+      type: object
+      required:
+        - monto_aprobado
+      properties:
+        monto_aprobado:
+          type: integer
+          description: Monto a reembolsar. Puede ser parcial.
+          example: 80000
+
+    RechazarReembolsoRequest:
+      type: object
+      required:
+        - motivo_rechazo
+      properties:
+        motivo_rechazo:
+          type: string
+          description: Motivo por el cual se rechaza el reembolso.
+          example: "El cliente no cumple con los requisitos de reembolso establecidos."
 
     # ----------------------------------------------------------
     # REQUESTS - TRAZABILIDAD

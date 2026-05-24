@@ -14,6 +14,7 @@ import { FacturaModule } from './factura/factura.module';
 import { HospitalizacionModule } from './hospitalizacion/hospitalizacion.module';
 import { NotaEvolucionModule } from './nota-evolucion/nota-evolucion.module';
 import { AuthModule } from './auth/auth.module';
+import { ReembolsoModule } from './reembolso/reembolso.module';
 
 @Module({
   imports: [
@@ -45,6 +46,7 @@ import { AuthModule } from './auth/auth.module';
     HospitalizacionModule,
     NotaEvolucionModule,
     AuthModule,
+    ReembolsoModule,
   ],
 })
 export class AppModule {}
