@@ -148,6 +148,8 @@ export class CitaService {
 
     if (citaConRelaciones) {
       const correoCliente = citaConRelaciones.mascota?.cliente?.usuario?.correo;
+      const nombreMascota = citaConRelaciones.mascota?.nombre;
+      const nombreVeterinario = citaConRelaciones.usuario?.nombre;
 
       if (correoCliente) {
         console.log('Enviando correo de confirmación...');
@@ -157,7 +159,18 @@ export class CitaService {
             pago.monto,
             servicios.map((s) => s.nombre),
           )
-          .catch((err) => console.error('Error enviando correo:', err));
+          .catch((err) => console.error('Error enviando correo de pago:', err));
+
+        if (nombreMascota && nombreVeterinario) {
+          this.mailService
+            .enviarInformacionCita(
+              correoCliente,
+              nombreMascota,
+              cita.fecha_hora,
+              nombreVeterinario,
+            )
+            .catch((err) => console.error('Error enviando correo de cita:', err));
+        }
       }
     }
 
