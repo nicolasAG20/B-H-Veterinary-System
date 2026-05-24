@@ -12,6 +12,7 @@ import { Cita, EstadoCita } from './entities/cita.entity';
 import { Servicio } from '../servicio/entities/servicio.entity';
 import { Factura, EstadoFactura } from '../factura/entities/factura.entity';
 import { Reembolso, EstadoReembolso } from '../reembolso/entities/reembolso.entity';
+import { MailService } from '../mail/mail.service';
 
 import { CreateCitaDto } from './dto/create-cita.dto';
 import { CancelarCitaDto } from './dto/cancelar-cita.dto';
@@ -46,6 +47,8 @@ export class CitaService {
 
     @InjectRepository(Reembolso)
     private readonly reembolsoRepository: Repository<Reembolso>,
+
+    private readonly mailService: MailService,
   ) {}
 
   /**
@@ -137,6 +140,26 @@ export class CitaService {
         cita: { idCita: cita.idCita } as any,
       }),
     );
+
+    const citaConRelaciones = await this.citaRepository.findOne({
+      where: { idCita: cita.idCita },
+      relations: ['mascota', 'mascota.cliente', 'mascota.cliente.usuario', 'usuario'],
+    });
+
+    if (citaConRelaciones) {
+      const correoCliente = citaConRelaciones.mascota?.cliente?.usuario?.correo;
+
+      if (correoCliente) {
+        console.log('Enviando correo de confirmación...');
+        this.mailService
+          .enviarConfirmacionPago(
+            correoCliente,
+            pago.monto,
+            servicios.map((s) => s.nombre),
+          )
+          .catch((err) => console.error('Error enviando correo:', err));
+      }
+    }
 
     return {
       message: 'Cita agendada y pago confirmado exitosamente',

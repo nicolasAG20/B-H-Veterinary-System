@@ -25,4 +25,26 @@ export class MailService {
       html: `<p>Tu código de verificación es: <strong>${codigo}</strong>. Expira en 15 minutos.</p>`,
     });
   }
+
+  async enviarConfirmacionPago(
+    correoCliente: string,
+    montoPagado: number,
+    nombresServicios: string[],
+  ): Promise<void> {
+    const serviciosHtml = nombresServicios
+      .map((nombre) => `<li>${nombre}</li>`)
+      .join('');
+
+    await this.transporter.sendMail({
+      from: this.configService.get<string>('MAIL_FROM'),
+      to: correoCliente,
+      subject: 'Confirmación de pago - B&H Veterinary System',
+      html: `
+        <h2>¡Tu pago fue procesado exitosamente!</h2>
+        <p><strong>Servicios contratados:</strong></p>
+        <ul>${serviciosHtml}</ul>
+        <p><strong>Monto pagado:</strong> $${montoPagado.toLocaleString('es-CO')}</p>
+      `,
+    });
+  }
 }

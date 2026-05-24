@@ -7,6 +7,7 @@ import { Factura } from '../factura/entities/factura.entity';
 import { Reembolso } from '../reembolso/entities/reembolso.entity';
 import { CitaService } from './cita.service';
 import { CitaController } from './cita.controller';
+import { MailModule } from '../mail/mail.module';
 
 /**
  * Módulo de gestión de citas veterinarias.
@@ -19,7 +20,7 @@ import { CitaController } from './cita.controller';
  * puedan acceder a la entidad `Cita` y su servicio si lo requieren.
  */
 @Module({
-  imports: [TypeOrmModule.forFeature([Cita, Servicio, Factura, Reembolso])],
+  imports: [TypeOrmModule.forFeature([Cita, Servicio, Factura, Reembolso]), MailModule],
   controllers: [CitaController],
   providers: [CitaService],
   exports: [CitaService, TypeOrmModule],
