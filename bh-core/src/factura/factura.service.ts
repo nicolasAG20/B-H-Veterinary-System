@@ -1,15 +1,30 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
-import { Factura } from './entities/factura.entity';
+import { In, Repository } from 'typeorm';
+import { Factura, EstadoFactura } from './entities/factura.entity';
+import { Cita, EstadoCita } from '../cita/entities/cita.entity';
+import { Producto } from '../producto/entities/producto.entity';
 import { CreateFacturaDto } from './dto/create-factura.dto';
 import { UpdateFacturaDto } from './dto/update-factura.dto';
+import { GenerarFacturaDto } from './dto/generar-factura.dto';
+
+export interface DetalleItem {
+  descripcion: string;
+  tipo: 'SERVICIO' | 'MEDICAMENTO';
+  cantidad: number;
+  precio_unitario: number;
+  subtotal: number;
+}
 
 @Injectable()
 export class FacturaService {
   constructor(
     @InjectRepository(Factura)
     private readonly facturaRepository: Repository<Factura>,
+    @InjectRepository(Cita)
+    private readonly citaRepository: Repository<Cita>,
+    @InjectRepository(Producto)
+    private readonly productoRepository: Repository<Producto>,
   ) {}
 
   async create(createFacturaDto: CreateFacturaDto) {
@@ -29,16 +44,27 @@ export class FacturaService {
   async findOne(id: number) {
     const factura = await this.facturaRepository.findOne({
       where: { idFactura: id },
-      relations: ['cita'],
+      relations: [
+        'cita',
+        'cita.servicios',
+        'cita.historiales',
+        'cita.historiales.medicamentos',
+        'cita.historiales.medicamentos.producto',
+      ],
     });
     if (!factura) {
       throw new NotFoundException(`Factura #${id} no encontrada`);
     }
-    return factura;
+    return this.buildFacturaResponse(factura);
   }
 
   async update(id: number, updateFacturaDto: UpdateFacturaDto) {
-    await this.findOne(id);
+    const existing = await this.facturaRepository.findOne({
+      where: { idFactura: id },
+      relations: ['cita'],
+    });
+    if (!existing) throw new NotFoundException(`Factura #${id} no encontrada`);
+
     const { citaId, ...rest } = updateFacturaDto;
     const updateData: any = Object.fromEntries(
       Object.entries(rest).filter(([, v]) => v !== undefined),
@@ -49,8 +75,151 @@ export class FacturaService {
   }
 
   async remove(id: number) {
-    await this.findOne(id);
+    const existing = await this.facturaRepository.findOne({
+      where: { idFactura: id },
+    });
+    if (!existing) throw new NotFoundException(`Factura #${id} no encontrada`);
     await this.facturaRepository.delete(id);
     return { message: 'Factura eliminada correctamente' };
+  }
+
+  async generarFactura(citaId: number, dto: GenerarFacturaDto) {
+    const { descuento = 0, medicamentos_adicionales = [] } = dto;
+
+    const cita = await this.citaRepository.findOne({
+      where: { idCita: citaId },
+      relations: [
+        'servicios',
+        'historiales',
+        'historiales.medicamentos',
+        'historiales.medicamentos.producto',
+      ],
+    });
+
+    if (!cita) {
+      throw new NotFoundException(`Cita #${citaId} no encontrada`);
+    }
+
+    if (cita.estado !== EstadoCita.FINALIZADA) {
+      throw new BadRequestException(
+        'Solo se puede generar factura para citas finalizadas',
+      );
+    }
+
+    const facturaExistente = await this.facturaRepository.findOne({
+      where: { cita: { idCita: citaId }, estado: EstadoFactura.PENDIENTE },
+    });
+
+    if (facturaExistente) {
+      throw new BadRequestException(
+        `Ya existe una factura pendiente para la cita #${citaId}`,
+      );
+    }
+
+    // Ítems de servicios de la cita
+    const detallesServicios: DetalleItem[] = (cita.servicios ?? []).map((s) => ({
+      descripcion: s.nombre,
+      tipo: 'SERVICIO',
+      cantidad: 1,
+      precio_unitario: s.precio,
+      subtotal: s.precio,
+    }));
+
+    // Ítems de medicamentos del historial médico
+    const detallesMedicamentosHistorial: DetalleItem[] = (cita.historiales ?? []).flatMap((h) =>
+      (h.medicamentos ?? []).map((m) => ({
+        descripcion: m.nombre,
+        tipo: 'MEDICAMENTO' as const,
+        cantidad: 1,
+        precio_unitario: Number(m.producto?.precio ?? 0),
+        subtotal: Number(m.producto?.precio ?? 0),
+      })),
+    );
+
+    // Ítems de medicamentos adicionales enviados por la recepcionista
+    let detallesMedicamentosAdicionales: DetalleItem[] = [];
+    if (medicamentos_adicionales.length > 0) {
+      const productoIds = medicamentos_adicionales.map((m) => m.productoId);
+      const productos = await this.productoRepository.findBy({
+        idProducto: In(productoIds),
+      });
+
+      detallesMedicamentosAdicionales = medicamentos_adicionales.map((ma) => {
+        const producto = productos.find((p) => p.idProducto === ma.productoId);
+        const precio_unitario = Number(producto?.precio ?? 0);
+        return {
+          descripcion: producto?.nombre ?? `Producto #${ma.productoId}`,
+          tipo: 'MEDICAMENTO' as const,
+          cantidad: ma.cantidad,
+          precio_unitario,
+          subtotal: precio_unitario * ma.cantidad,
+        };
+      });
+    }
+
+    const detalles: DetalleItem[] = [
+      ...detallesServicios,
+      ...detallesMedicamentosHistorial,
+      ...detallesMedicamentosAdicionales,
+    ];
+
+    const subtotal = detalles.reduce((acc, i) => acc + i.subtotal, 0);
+    const total = subtotal - descuento;
+
+    const factura = await this.facturaRepository.save(
+      this.facturaRepository.create({
+        subtotal,
+        total,
+        descuento,
+        estado: EstadoFactura.PENDIENTE,
+        cita: { idCita: citaId } as any,
+      }),
+    );
+
+    return {
+      idFactura: factura.idFactura,
+      subtotal: factura.subtotal,
+      total: factura.total,
+      descuento: factura.descuento,
+      estado: factura.estado,
+      citaId,
+      detalles,
+    };
+  }
+
+  // ─────────────────────────────────────────────
+  // Métodos privados
+  // ─────────────────────────────────────────────
+
+  private buildFacturaResponse(factura: Factura) {
+    const detallesServicios: DetalleItem[] = (factura.cita?.servicios ?? []).map((s) => ({
+      descripcion: s.nombre,
+      tipo: 'SERVICIO' as const,
+      cantidad: 1,
+      precio_unitario: s.precio,
+      subtotal: s.precio,
+    }));
+
+    const detallesMedicamentos: DetalleItem[] = (factura.cita?.historiales ?? []).flatMap((h) =>
+      (h.medicamentos ?? []).map((m) => ({
+        descripcion: m.nombre,
+        tipo: 'MEDICAMENTO' as const,
+        cantidad: 1,
+        precio_unitario: Number(m.producto?.precio ?? 0),
+        subtotal: Number(m.producto?.precio ?? 0),
+      })),
+    );
+
+    return {
+      idFactura: factura.idFactura,
+      subtotal: factura.subtotal,
+      total: factura.total,
+      descuento: factura.descuento,
+      monto_pagado: factura.monto_pagado,
+      estado: factura.estado,
+      motivo_anulacion: factura.motivo_anulacion,
+      citaId: factura.cita?.idCita,
+      detalles: [...detallesServicios, ...detallesMedicamentos],
+    };
   }
 }
