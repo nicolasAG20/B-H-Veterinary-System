@@ -1,22 +1,22 @@
 import {
   BadRequestException,
   ConflictException,
+  ForbiddenException,
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
 
 import { InjectRepository } from '@nestjs/typeorm';
-
-import { Repository } from 'typeorm';
+import { DataSource, Repository } from 'typeorm';
 
 import { HistorialMedico } from './entities/historial-medico.entity';
-
 import { CreateHistorialMedicoDto } from './dto/create-historial-medico.dto';
 import { UpdateHistorialMedicoDto } from './dto/update-historial-medico.dto';
 
 import { Cita, EstadoCita } from '../cita/entities/cita.entity';
-
 import { Medicamento } from '../medicamento/entities/medicamento.entity';
+import { Mascota } from '../mascota/entities/mascota.entity';
+import { RolUsuario } from '../usuario/entities/usuario.entity';
 
 @Injectable()
 export class HistorialMedicoService {
@@ -29,92 +29,80 @@ export class HistorialMedicoService {
 
     @InjectRepository(Medicamento)
     private readonly medicamentoRepository: Repository<Medicamento>,
+
+    @InjectRepository(Mascota)
+    private readonly mascotaRepository: Repository<Mascota>,
+
+    private readonly dataSource: DataSource,
   ) {}
 
-  async create(createDto: CreateHistorialMedicoDto) {
-    const {
-      citaId,
-      usuarioId,
-      medicamentos_prescritos,
-      ...historialData
-    } = createDto;
-
+  async createMedicalRecord(
+    appointmentId: number,
+    veterinarioId: number,
+    createDto: CreateHistorialMedicoDto,
+  ) {
     const cita = await this.citaRepository.findOne({
-      where: {
-        idCita: citaId,
-      },
+      where: { idCita: appointmentId },
+      relations: ['usuario', 'mascota'],
     });
 
-    if (!cita) {
-      throw new NotFoundException(
-        `La cita #${citaId} no existe`,
+    if (!cita) throw new NotFoundException('Cita no encontrada.');
+
+    if (!cita.usuario || cita.usuario.id !== veterinarioId) {
+      throw new ForbiddenException(
+        'Solo el veterinario asignado a la cita puede registrar el historial médico.',
       );
     }
 
     if (cita.estado !== EstadoCita.FINALIZADA) {
-      throw new BadRequestException(
-        'No se puede registrar el historial médico porque la cita aún no ha finalizado',
+      throw new ConflictException(
+        'No se puede registrar el historial médico hasta que la cita haya finalizado.',
       );
     }
 
-    const historialExistente =
-      await this.historialRepository.findOne({
-        where: {
-          cita: {
-            idCita: citaId,
-          },
-        },
-      });
+    const historialExistente = await this.historialRepository.findOne({
+      where: { cita: { idCita: appointmentId } },
+    });
 
     if (historialExistente) {
-      throw new ConflictException(
-        'La cita ya tiene un historial médico registrado',
-      );
+      throw new ConflictException('La cita ya tiene un historial médico registrado.');
     }
-    
-    const historial =
-      this.historialRepository.create({
-        ...historialData,
 
-        fecha_creacion: new Date(),
+    const historial = this.historialRepository.create({
+      motivo_visita: createDto.motivo_visita,
+      diagnostico: createDto.diagnostico,
+      tratamiento: createDto.tratamiento,
+      peso_mascota: createDto.peso_mascota,
+      proxima_visita: createDto.proxima_visita
+        ? new Date(createDto.proxima_visita)
+        : null,
+      fecha_creacion: new Date(),
+      cita,
+      usuario: cita.usuario,
+    });
 
-        cita: {
-          idCita: citaId,
-        } as Cita,
+    const historialGuardado = await this.historialRepository.save(historial);
 
-        usuario: {
-          id: usuarioId,
-        } as any,
-      });
+    await this.mascotaRepository.update(cita.mascota.idMascota, {
+      peso: createDto.peso_mascota,
+    });
 
-    const historialGuardado =
-      await this.historialRepository.save(
-        historial,
-      );
+    const medicamentos = createDto.medicamentos ?? [];
 
-    const medicamentos =
-      medicamentos_prescritos.map(
-        (medicamento) =>
-          this.medicamentoRepository.create({
-            nombre: medicamento.nombre,
-
-            dosis: medicamento.dosis,
-
-            duracion: medicamento.duracion,
-
-            historialMedico: historialGuardado,
-          }),
-      );
-
-    const medicamentosGuardados =
-      await this.medicamentoRepository.save(
-        medicamentos,
-      );
+    const medicamentosGuardados = await this.medicamentoRepository.save(
+      medicamentos.map((medicamento) =>
+        this.medicamentoRepository.create({
+          nombre: medicamento.nombre_medicamento,
+          dosis: medicamento.dosis,
+          duracion: medicamento.duracion,
+          producto: { idProducto: medicamento.productoId } as any,
+          historialMedico: historialGuardado,
+        }),
+      ),
+    );
 
     return {
-      message:
-        'Historial médico registrado correctamente',
-
+      message: 'Historial médico registrado exitosamente.',
       historial: {
         ...historialGuardado,
         medicamentos: medicamentosGuardados,
@@ -122,64 +110,167 @@ export class HistorialMedicoService {
     };
   }
 
-  async findAll() {
-    return await this.historialRepository.find({
-      relations: [
-        'cita',
-        'usuario',
-        'medicamentos',
-      ],
-    });
-  }
+  async getPetMedicalHistory(petId: number, user: any) {
+    const mascota = await this.dataSource.query(
+      `
+      SELECT 
+        m.idMascota,
+        c.Usuario_id AS usuarioClienteId
+      FROM Mascota m
+      INNER JOIN Cliente c ON c.idCliente = m.Cliente_id
+      WHERE m.idMascota = ?
+      `,
+      [petId],
+    );
 
-  async findOne(id: number) {
-    const historial =
-      await this.historialRepository.findOne({
-        where: {
-          idHistorial_medico: id,
-        },
+    if (!mascota.length) {
+      throw new NotFoundException('Mascota no encontrada.');
+    }
 
-        relations: [
-          'cita',
-          'usuario',
-          'medicamentos',
-        ],
-      });
-
-    if (!historial) {
-      throw new NotFoundException(
-        `Historial médico #${id} no encontrado`,
+    if (
+      user.rol === RolUsuario.CLIENTE &&
+      Number(mascota[0].usuarioClienteId) !== Number(user.sub)
+    ) {
+      throw new ForbiddenException(
+        'No tiene permisos para acceder a este historial médico.',
       );
     }
 
-    return historial;
+    return this.dataSource.query(
+      `
+      SELECT 
+        h.idHistorial_medico,
+        h.motivo_visita,
+        h.diagnostico,
+        h.tratamiento,
+        h.peso_mascota,
+        h.proxima_visita,
+        h.fecha_creacion,
+        h.Cita_id,
+        h.Usuario_id,
+        c.Mascota_id
+      FROM Historial_medico h
+      INNER JOIN Cita c ON c.idCita = h.Cita_id
+      WHERE c.Mascota_id = ?
+      ORDER BY h.fecha_creacion DESC
+      `,
+      [petId],
+    );
   }
 
-  async update(
-    id: number,
-    updateDto: UpdateHistorialMedicoDto,
-  ) {
-    await this.findOne(id);
-
-    await this.historialRepository.update(
-      id,
-      updateDto,
+  async getMedicalRecordById(recordId: number, user: any) {
+    const historial = await this.dataSource.query(
+      `
+      SELECT 
+        h.idHistorial_medico,
+        h.motivo_visita,
+        h.diagnostico,
+        h.tratamiento,
+        h.peso_mascota,
+        h.proxima_visita,
+        h.fecha_creacion,
+        h.Cita_id,
+        h.Usuario_id,
+        c.Mascota_id,
+        cl.Usuario_id AS usuarioClienteId
+      FROM Historial_medico h
+      INNER JOIN Cita c ON c.idCita = h.Cita_id
+      INNER JOIN Mascota m ON m.idMascota = c.Mascota_id
+      INNER JOIN Cliente cl ON cl.idCliente = m.Cliente_id
+      WHERE h.idHistorial_medico = ?
+      `,
+      [recordId],
     );
 
+    if (!historial.length) {
+      throw new NotFoundException('Registro médico no encontrado.');
+    }
+
+    const registro = historial[0];
+
+    if (
+      user.rol === RolUsuario.CLIENTE &&
+      Number(registro.usuarioClienteId) !== Number(user.sub)
+    ) {
+      throw new ForbiddenException(
+        'No tiene permisos para acceder a este historial médico.',
+      );
+    }
+
+    return registro;
+  }
+
+  async updateMedicalRecord(
+    recordId: number,
+    veterinarioId: number,
+    updateDto: UpdateHistorialMedicoDto,
+  ) {
+    const historial = await this.historialRepository.findOne({
+      where: { idHistorial_medico: recordId },
+      relations: ['usuario', 'cita', 'cita.mascota'],
+    });
+
+    if (!historial) {
+      throw new NotFoundException('Registro médico no encontrado.');
+    }
+
+    if (!historial.usuario || historial.usuario.id !== veterinarioId) {
+      throw new ForbiddenException(
+        'Solo el veterinario que creó el historial médico puede corregirlo.',
+      );
+    }
+
+    this.validarTiempoCorreccion(historial.fecha_creacion);
+
+    if (updateDto.motivo_visita !== undefined) {
+      historial.motivo_visita = updateDto.motivo_visita;
+    }
+
+    if (updateDto.diagnostico !== undefined) {
+      historial.diagnostico = updateDto.diagnostico;
+    }
+
+    if (updateDto.tratamiento !== undefined) {
+      historial.tratamiento = updateDto.tratamiento;
+    }
+
+    if (updateDto.peso_mascota !== undefined) {
+      historial.peso_mascota = updateDto.peso_mascota;
+
+      if (historial.cita?.mascota) {
+        await this.mascotaRepository.update(historial.cita.mascota.idMascota, {
+          peso: updateDto.peso_mascota,
+        });
+      }
+    }
+
+    if (updateDto.proxima_visita !== undefined) {
+      historial.proxima_visita = updateDto.proxima_visita
+        ? new Date(updateDto.proxima_visita)
+        : null;
+    }
+
+    const historialActualizado = await this.historialRepository.save(historial);
+
     return {
-      message:
-        'Historial médico actualizado correctamente',
+      message: 'Registro actualizado exitosamente.',
+      historial: historialActualizado,
     };
   }
 
-  async remove(id: number) {
-    await this.findOne(id);
+  private validarTiempoCorreccion(fechaCreacion: Date): void {
+    if (!fechaCreacion) {
+      throw new BadRequestException('El registro no tiene fecha de creación válida.');
+    }
 
-    await this.historialRepository.delete(id);
+    const horas =
+      (new Date().getTime() - new Date(fechaCreacion).getTime()) /
+      (1000 * 60 * 60);
 
-    return {
-      message:
-        'Historial médico eliminado correctamente',
-    };
+    if (horas > 24) {
+      throw new ForbiddenException(
+        'El tiempo de edición terminó. Solo se puede corregir el historial médico durante las primeras 24 horas.',
+      );
+    }
   }
 }

@@ -1,34 +1,65 @@
-import { Controller, Get, Post, Body, Patch, Param, Delete } from '@nestjs/common';
+import {
+  Body,
+  Controller,
+  Get,
+  Param,
+  Post,
+  Put,
+  Req,
+  UseGuards,
+} from '@nestjs/common';
+
 import { HistorialMedicoService } from './historial-medico.service';
 import { CreateHistorialMedicoDto } from './dto/create-historial-medico.dto';
 import { UpdateHistorialMedicoDto } from './dto/update-historial-medico.dto';
 
-@Controller('historiales-medicos')
+import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
+import { RolesGuard } from '../auth/guards/roles.guard';
+import { Roles } from '../auth/decorators/roles.decorator';
+import { RolUsuario } from '../usuario/entities/usuario.entity';
+
+@UseGuards(JwtAuthGuard, RolesGuard)
+@Controller()
 export class HistorialMedicoController {
   constructor(private readonly historialMedicoService: HistorialMedicoService) {}
 
-  @Post()
-  create(@Body() createHistorialMedicoDto: CreateHistorialMedicoDto) {
-    return this.historialMedicoService.create(createHistorialMedicoDto);
+  @Post('appointments/:appointmentId/medical-record')
+  @Roles(RolUsuario.VETERINARIO)
+  createMedicalRecord(
+    @Param('appointmentId') appointmentId: string,
+    @Body() dto: CreateHistorialMedicoDto,
+    @Req() req: any,
+  ) {
+    return this.historialMedicoService.createMedicalRecord(
+      +appointmentId,
+      req.user.sub,
+      dto,
+    );
   }
 
-  @Get()
-  findAll() {
-    return this.historialMedicoService.findAll();
+  @Get('pets/:petId/medical-history')
+  @Roles(RolUsuario.CLIENTE, RolUsuario.RECEPCIONISTA, RolUsuario.VETERINARIO)
+  getPetMedicalHistory(@Param('petId') petId: string, @Req() req: any) {
+    return this.historialMedicoService.getPetMedicalHistory(+petId, req.user);
   }
 
-  @Get(':id')
-  findOne(@Param('id') id: string) {
-    return this.historialMedicoService.findOne(+id);
+  @Get('medical-records/:recordId')
+  @Roles(RolUsuario.CLIENTE, RolUsuario.RECEPCIONISTA, RolUsuario.VETERINARIO)
+  getMedicalRecordById(@Param('recordId') recordId: string, @Req() req: any) {
+    return this.historialMedicoService.getMedicalRecordById(+recordId, req.user);
   }
 
-  @Patch(':id')
-  update(@Param('id') id: string, @Body() updateHistorialMedicoDto: UpdateHistorialMedicoDto) {
-    return this.historialMedicoService.update(+id, updateHistorialMedicoDto);
-  }
-
-  @Delete(':id')
-  remove(@Param('id') id: string) {
-    return this.historialMedicoService.remove(+id);
+  @Put('medical-records/:recordId')
+  @Roles(RolUsuario.VETERINARIO)
+  updateMedicalRecord(
+    @Param('recordId') recordId: string,
+    @Body() dto: UpdateHistorialMedicoDto,
+    @Req() req: any,
+  ) {
+    return this.historialMedicoService.updateMedicalRecord(
+      +recordId,
+      req.user.sub,
+      dto,
+    );
   }
 }
