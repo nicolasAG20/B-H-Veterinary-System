@@ -6,9 +6,6 @@ export class UpdateInventarioEntidades1779408600000 implements MigrationInterfac
       `ALTER TABLE \`Producto\` ADD \`nombre\` VARCHAR(100) NOT NULL DEFAULT ''`,
     );
     await queryRunner.query(
-      `ALTER TABLE \`Medicamento\` ADD \`nombre\` VARCHAR(100) NOT NULL DEFAULT ''`,
-    );
-    await queryRunner.query(
       `ALTER TABLE \`Medicamento\` DROP COLUMN \`nombre_medicamento\``,
     );
     await queryRunner.query(
@@ -19,6 +16,9 @@ export class UpdateInventarioEntidades1779408600000 implements MigrationInterfac
   public async down(queryRunner: QueryRunner): Promise<void> {
     await queryRunner.query(
       `ALTER TABLE \`Vacunacion\` ADD \`nombre_vacuna\` VARCHAR(60) NOT NULL DEFAULT ''`,
+    );
+    await queryRunner.query(
+      `ALTER TABLE \`Vacunacion\` DROP COLUMN \`nombre\``,
     );
     await queryRunner.query(
       `ALTER TABLE \`Medicamento\` ADD \`nombre_medicamento\` VARCHAR(50) NOT NULL DEFAULT ''`,

@@ -1,8 +1,10 @@
-import { IsDateString, IsInt, IsPositive, IsString } from 'class-validator';
+import { IsDateString, IsInt, IsNotEmpty, IsPositive, IsString } from 'class-validator';
 
 export class CreateVacunacionDto {
+
   @IsString()
-  nombre_vacuna: string;
+  @IsNotEmpty()
+  nombre: string;
 
   @IsDateString()
   fecha_proxima_dosis: string;

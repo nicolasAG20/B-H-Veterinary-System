@@ -19,6 +19,7 @@ import { Medicamento } from '../medicamento/entities/medicamento.entity';
 import { Mascota } from '../mascota/entities/mascota.entity';
 import { Producto } from '../producto/entities/producto.entity';
 import { RolUsuario } from '../usuario/entities/usuario.entity';
+import { Vacunacion } from '../vacunacion/entities/vacunacion.entity';
 
 @Injectable()
 export class HistorialMedicoService {
@@ -31,6 +32,9 @@ export class HistorialMedicoService {
 
     @InjectRepository(Medicamento)
     private readonly medicamentoRepository: Repository<Medicamento>,
+
+    @InjectRepository(Vacunacion)
+    private readonly vacunacionRepository: Repository<Vacunacion>,
 
     @InjectRepository(Mascota)
     private readonly mascotaRepository: Repository<Mascota>,
@@ -138,11 +142,40 @@ export class HistorialMedicoService {
 
       medicamentosGuardados.push(medicamentoGuardado);
     }
+
+    // Se registran las vacunas aplicadas dentro del historial medico.
+    const vacunaciones = createDto.vacunaciones ?? [];
+    const vacunacionesGuardadas: Vacunacion[] = [];
+
+    for (const vacunacion of vacunaciones) {
+      const producto = await this.dataSource.getRepository(Producto).findOne({
+        where: { idProducto: vacunacion.productoId },
+      });
+
+      if (!producto) {
+        throw new NotFoundException(
+          `La vacuna con productoId ${vacunacion.productoId} no esta registrada en el inventario.`,
+        );
+      }
+
+      const vacunacionGuardada = await this.vacunacionRepository.save(
+        this.vacunacionRepository.create({
+          nombre: vacunacion.nombre,
+          fecha_aplicacion: new Date(vacunacion.fecha_aplicacion),
+          fecha_proxima_dosis: new Date(vacunacion.fecha_proxima_dosis),
+          producto,
+          historialMedico: historialGuardado,
+        }),
+      );
+
+      vacunacionesGuardadas.push(vacunacionGuardada);
+    }
     return {
       message: 'Historial médico registrado exitosamente.',
       historial: {
         ...historialGuardado,
         medicamentos: medicamentosGuardados,
+        vacunaciones: vacunacionesGuardadas,
       },
     };
   }
