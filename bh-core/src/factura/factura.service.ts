@@ -4,11 +4,16 @@ import { In, Repository } from 'typeorm';
 import { Factura, EstadoFactura } from './entities/factura.entity';
 import { Cita, EstadoCita } from '../cita/entities/cita.entity';
 import { Producto } from '../producto/entities/producto.entity';
+import { Cliente } from '../cliente/entities/cliente.entity';
 import { CreateFacturaDto } from './dto/create-factura.dto';
 import { UpdateFacturaDto } from './dto/update-factura.dto';
 import { GenerarFacturaDto } from './dto/generar-factura.dto';
 import { AplicarDescuentoDto } from './dto/aplicar-descuento.dto';
 import { AnularFacturaDto } from './dto/anular-factura.dto';
+import { resolve } from 'path';
+import { timeout } from 'rxjs';
+
+const PDFDocument = require('pdfkit-table');
 
 export interface DetalleItem {
   descripcion: string;
@@ -27,6 +32,8 @@ export class FacturaService {
     private readonly citaRepository: Repository<Cita>,
     @InjectRepository(Producto)
     private readonly productoRepository: Repository<Producto>,
+    @InjectRepository(Cliente)
+    private readonly clienteRepository: Repository<Cliente>,
   ) {}
 
   async create(createFacturaDto: CreateFacturaDto) {
@@ -248,6 +255,128 @@ export class FacturaService {
     return this.buildFacturaResponse(factura);
   }
 
+    async generarPDF(id: number): Promise<Buffer>{
+      const factura = await this.facturaRepository.findOne({
+      where: { idFactura: id },
+      relations: [
+        'cita',
+        'cita.servicios',
+        'cita.usuario',
+        'cita.mascota',
+        'cita.historiales',
+        'cita.historiales.medicamentos',
+        'cita.historiales.medicamentos.producto',
+      ],
+    });
+      
+
+    if (!factura) {
+      throw new NotFoundException(`Factura #${id} no encontrada`);
+    }
+    const cita = factura.cita ; 
+    const usuario = cita.usuario;
+
+    const servicios = cita.servicios; 
+      const pdfBuffer: Buffer = await new Promise( resolve => {
+        const doc = new PDFDocument(
+          {
+            size: "LETTER" , 
+            bufferPages: true ,
+            autoFirstPage : false
+          }
+        )
+        doc.addPage(); 
+        doc.fontSize(24);
+        doc.text("BH Veterinaria" ,{
+          align: 'center'
+        }); 
+        doc.fontSize(14);
+        doc.text("Factura electronica " ,{
+          align: 'center'
+        }); 
+        doc.fontSize(10);
+        doc.text(`ID Factura: ${factura.idFactura}`,{
+          align: 'center'
+        });
+         doc.moveDown();
+        
+        
+        doc.moveDown();
+        doc.fontSize(12);
+        doc.text(`Cliente: ${usuario.nombre}`,{
+          align: 'center'
+        });
+        doc.text(`Mascota: ${cita.mascota.nombre}`,{
+          align: 'center'
+        });
+        doc.moveDown();
+        doc.text(`ID usuario: ${usuario.id ?? 0}`,{
+          align: 'center'
+        });
+        doc.text(`ID cita: ${cita.idCita ?? 0}`,{
+          align: 'center'
+        });
+
+       
+        const row_servicios = []; 
+        servicios.forEach(element => {
+          const temp_list = [element.idServicio , element.nombre , element.precio];
+          row_servicios.push(temp_list);
+        })
+
+        const table = {
+          title: "servicios usados",
+          headers:['id','nombre', 'precio'],
+          rows: row_servicios,
+          options: {
+            divider:{
+              horizontal:{disabled: true , with: 0.5 , opacity : 0.5}
+            }
+          }
+
+        }
+        doc.font('Helvetica');
+        doc.moveDown();
+        doc.moveDown();
+        doc.table(table,{
+          columnSize:[200,300,150],
+          prepareRow: (row, indexColumn, indexRow, rectRow, rectCell) => {
+          doc.font('Helvetica').fontSize(15);
+          },
+        })
+
+        doc.moveDown();
+        doc.font('Helvetica').fontSize(12);
+        doc.text(`Sub total: $${factura.subtotal ?? 0}`,{
+          align: 'center'
+        });
+        doc.text(`descuento: $${factura.descuento ?? 0}`,{
+          align: 'center'
+        });
+        doc.moveDown();
+        doc.fontSize(18);
+        doc.text(`Total: $${factura.total ?? 0}`,{
+          align: 'center'
+        });
+        doc.moveDown();
+      
+
+
+
+
+        const buffer = []
+        doc.on('data', buffer.push.bind(buffer))
+        doc.on('end', () => {
+            const data = Buffer.concat(buffer)
+            resolve(data)
+        })
+        doc.end()
+
+      })
+
+      return pdfBuffer;
+
+    }
   // ─────────────────────────────────────────────
   // Métodos privados
   // ─────────────────────────────────────────────
