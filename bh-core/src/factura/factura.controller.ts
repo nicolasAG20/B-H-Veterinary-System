@@ -61,6 +61,7 @@ export class FacturaController {
   }
 
   @Get(':id/pdf')
+  @UseGuards(RolesGuard)
   @Roles(RolUsuario.CLIENTE , RolUsuario.ADMINISTRADOR)
   async downloadPDF(@Res() res ,@Param('id') id: string): Promise<void>{
     

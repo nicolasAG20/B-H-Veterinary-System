@@ -136,6 +136,7 @@ export class CitaController {
   }
 
   @Post('pdfCitas')
+  @UseGuards(RolesGuard)
   @Roles(RolUsuario.ADMINISTRADOR)
     async downloadPDF(@Res() res ,@Body() pdfCitaDto: pdfCitaDto): Promise<void>{
       
