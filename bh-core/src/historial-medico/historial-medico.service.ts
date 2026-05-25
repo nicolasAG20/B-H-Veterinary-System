@@ -2,8 +2,9 @@ import {
   BadRequestException,
   ConflictException,
   ForbiddenException,
+  Inject,
   Injectable,
-  
+
   NotFoundException,
 } from '@nestjs/common';
 
@@ -20,6 +21,12 @@ import { Mascota } from '../mascota/entities/mascota.entity';
 import { Producto } from '../producto/entities/producto.entity';
 import { RolUsuario } from '../usuario/entities/usuario.entity';
 import { Vacunacion } from '../vacunacion/entities/vacunacion.entity';
+import {
+  ActorAuditoria,
+  AUDIT_CLIENT,
+  IAuditClient,
+  TipoAccion,
+} from '../audit/audit.types';
 
 @Injectable()
 export class HistorialMedicoService {
@@ -40,12 +47,16 @@ export class HistorialMedicoService {
     private readonly mascotaRepository: Repository<Mascota>,
 
     private readonly dataSource: DataSource,
+
+    @Inject(AUDIT_CLIENT)
+    private readonly auditClient: IAuditClient,
   ) {}
 
   async createMedicalRecord(
     appointmentId: number,
     veterinarioId: number,
     createDto: CreateHistorialMedicoDto,
+    actor: ActorAuditoria,
   ) {
     const cita = await this.citaRepository.findOne({
       where: { idCita: appointmentId },
@@ -175,6 +186,12 @@ export class HistorialMedicoService {
 
       vacunacionesGuardadas.push(vacunacionGuardada);
     }
+
+    await this.registrarEvento(TipoAccion.CREACION_HISTORIAL_MEDICO, actor);
+    for (const _ of vacunacionesGuardadas) {
+      await this.registrarEvento(TipoAccion.REGISTRO_VACUNA, actor);
+    }
+
     return {
       message: 'Historial médico registrado exitosamente.',
       historial: {
@@ -279,6 +296,7 @@ export class HistorialMedicoService {
     recordId: number,
     veterinarioId: number,
     updateDto: UpdateHistorialMedicoDto,
+    actor: ActorAuditoria,
   ) {
     const historial = await this.historialRepository.findOne({
       where: { idHistorial_medico: recordId },
@@ -327,10 +345,29 @@ export class HistorialMedicoService {
 
     const historialActualizado = await this.historialRepository.save(historial);
 
+    await this.registrarEvento(TipoAccion.EDICION_HISTORIAL_MEDICO, actor);
+
     return {
       message: 'Registro actualizado exitosamente.',
       historial: historialActualizado,
     };
+  }
+
+  /**
+   * Notifica a bh-audit un evento relacionado con el historial médico,
+   * identificando como actor al veterinario autenticado.
+   */
+  private async registrarEvento(
+    tipoAccion: TipoAccion,
+    actor: ActorAuditoria,
+  ): Promise<void> {
+    await this.auditClient.registrar({
+      tipo_accion: tipoAccion,
+      usuarioId: actor.id,
+      nombre_usuario: actor.nombre,
+      rol: actor.rol,
+      fecha_hora: new Date().toISOString(),
+    });
   }
 
   private validarTiempoCorreccion(fechaCreacion: Date): void {

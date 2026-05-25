@@ -1,5 +1,6 @@
 import {
   ConflictException,
+  Inject,
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
@@ -18,6 +19,12 @@ import {
   IResultadoInternacion,
   IResultadoAlta,
 } from './interfaces/hospitalizacion.interface';
+import {
+  ActorAuditoria,
+  AUDIT_CLIENT,
+  IAuditClient,
+  TipoAccion,
+} from '../audit/audit.types';
 
 /**
  * Servicio de gestión de hospitalizaciones veterinarias.
@@ -37,6 +44,9 @@ export class HospitalizacionService {
 
     @InjectRepository(Mascota)
     private readonly mascotaRepository: Repository<Mascota>,
+
+    @Inject(AUDIT_CLIENT)
+    private readonly auditClient: IAuditClient,
   ) {}
 
   /**
@@ -53,7 +63,10 @@ export class HospitalizacionService {
    * @throws NotFoundException si la mascota no existe.
    * @throws ConflictException si la mascota ya se encuentra hospitalizada.
    */
-  async create(dto: CreateHospitalizacionDto): Promise<IResultadoInternacion> {
+  async create(
+    dto: CreateHospitalizacionDto,
+    actor: ActorAuditoria,
+  ): Promise<IResultadoInternacion> {
     const { mascotaId, veterinarioId, ...rest } = dto;
 
     const mascota = await this.findMascotaOrFail(mascotaId);
@@ -67,6 +80,8 @@ export class HospitalizacionService {
 
     await this.hospitalizacionRepository.save(hospitalizacion);
     await this.actualizarEstadoMascota(mascotaId, EstadoMascota.HOSPITALIZADA);
+
+    await this.registrarEvento(TipoAccion.INICIO_HOSPITALIZACION, actor);
 
     return {
       message: 'Mascota internada exitosamente',
@@ -121,7 +136,11 @@ export class HospitalizacionService {
    * @throws NotFoundException si la hospitalización no existe.
    * @throws ConflictException si la hospitalización ya fue dada de alta.
    */
-  async discharge(id: number, dto: DarAltaDto): Promise<IResultadoAlta> {
+  async discharge(
+    id: number,
+    dto: DarAltaDto,
+    actor: ActorAuditoria,
+  ): Promise<IResultadoAlta> {
     const hospitalizacion = await this.findOne(id);
 
     this.validarNoDadaDeAlta(hospitalizacion);
@@ -137,6 +156,8 @@ export class HospitalizacionService {
     );
 
     const hospitalizacionActualizada = await this.findOne(id);
+
+    await this.registrarEvento(TipoAccion.ALTA_HOSPITALIZACION, actor);
 
     return {
       message: 'Alta registrada exitosamente',
@@ -269,5 +290,22 @@ export class HospitalizacionService {
     estado: EstadoMascota,
   ): Promise<void> {
     await this.mascotaRepository.update(mascotaId, { estado });
+  }
+
+  /**
+   * Notifica a bh-audit un evento del ciclo de hospitalización,
+   * identificando como actor al usuario autenticado.
+   */
+  private async registrarEvento(
+    tipoAccion: TipoAccion,
+    actor: ActorAuditoria,
+  ): Promise<void> {
+    await this.auditClient.registrar({
+      tipo_accion: tipoAccion,
+      usuarioId: actor.id,
+      nombre_usuario: actor.nombre,
+      rol: actor.rol,
+      fecha_hora: new Date().toISOString(),
+    });
   }
 }

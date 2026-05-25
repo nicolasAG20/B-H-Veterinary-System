@@ -1,6 +1,7 @@
 import {
   BadRequestException,
   ConflictException,
+  Inject,
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
@@ -25,6 +26,12 @@ import {
   EstimateCitaResponse,
 } from './interfaces/estimate-cita.interface';
 import { IResultadoVerificacionPago } from './interfaces/pago.interface';
+import {
+  ActorAuditoria,
+  AUDIT_CLIENT,
+  IAuditClient,
+  TipoAccion,
+} from '../audit/audit.types';
 
 const PDFDocument = require('pdfkit-table');
 /**
@@ -50,6 +57,9 @@ export class CitaService {
     private readonly reembolsoRepository: Repository<Reembolso>,
 
     private readonly mailService: MailService,
+
+    @Inject(AUDIT_CLIENT)
+    private readonly auditClient: IAuditClient,
   ) {}
 
   /**
@@ -96,7 +106,7 @@ export class CitaService {
    * @throws BadRequestException si algún servicio no existe o el pago es insuficiente.
    * @throws ConflictException si algún servicio está inactivo.
    */
-  async create(createCitaDto: CreateCitaDto) {
+  async create(createCitaDto: CreateCitaDto, actor: ActorAuditoria) {
     const {
       mascotaId,
       usuarioId,
@@ -174,6 +184,9 @@ export class CitaService {
         }
       }
     }
+
+    await this.registrarEvento(TipoAccion.CREACION_CITA, actor);
+    await this.registrarEvento(TipoAccion.PAGO_CITA, actor);
 
     return {
       message: 'Cita agendada y pago confirmado exitosamente',
@@ -352,6 +365,7 @@ export class CitaService {
     async cancelar(
       id: number,
       cancelarCitaDto: CancelarCitaDto,
+      actor: ActorAuditoria,
     ) {
 
     // Busca la cita en la base de datos
@@ -391,11 +405,30 @@ export class CitaService {
       );
     }
 
+    await this.registrarEvento(TipoAccion.CAMBIO_ESTADO_CITA, actor);
+
     // Retorna respuesta exitosa
     return {
       message: 'Cita cancelada correctamente',
       cita,
     };
+  }
+
+  /**
+   * Helper que notifica a bh-audit un evento relacionado con citas,
+   * identificando como actor al usuario que originó la operación.
+   */
+  private async registrarEvento(
+    tipoAccion: TipoAccion,
+    actor: ActorAuditoria,
+  ): Promise<void> {
+    await this.auditClient.registrar({
+      tipo_accion: tipoAccion,
+      usuarioId: actor.id,
+      nombre_usuario: actor.nombre,
+      rol: actor.rol,
+      fecha_hora: new Date().toISOString(),
+    });
   }
    /**
    * Valida y retorna los servicios correspondientes a los IDs proporcionados.

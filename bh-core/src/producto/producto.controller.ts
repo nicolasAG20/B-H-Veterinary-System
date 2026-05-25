@@ -8,6 +8,8 @@ import { RolesGuard } from '../auth/guards/roles.guard';
 import { Roles } from '../auth/decorators/roles.decorator';
 import { RolUsuario } from '../usuario/entities/usuario.entity';
 import { ListNearExpirationProductsDto } from './dto/list-near-expiration-products.dto';
+import { Actor } from '../audit/actor.decorator';
+import { ActorAuditoria } from '../audit/audit.types';
 
 @Controller('products')
 export class ProductoController {
@@ -62,7 +64,8 @@ export class ProductoController {
   adjustStock(
     @Param('productId', ParseIntPipe) productId: number,
     @Body() ajustarStockDto: AjustarStockDto,
+    @Actor() actor: ActorAuditoria,
   ) {
-    return this.productoService.adjustStock(productId, ajustarStockDto);
+    return this.productoService.adjustStock(productId, ajustarStockDto, actor);
   }
 }

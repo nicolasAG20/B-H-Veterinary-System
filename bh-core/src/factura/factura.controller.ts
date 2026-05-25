@@ -9,6 +9,8 @@ import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { RolesGuard } from '../auth/guards/roles.guard';
 import { Roles } from '../auth/decorators/roles.decorator';
 import { RolUsuario } from '../usuario/entities/usuario.entity';
+import { Actor } from '../audit/actor.decorator';
+import { ActorAuditoria } from '../audit/audit.types';
 
 
 @UseGuards(JwtAuthGuard)
@@ -47,8 +49,9 @@ export class FacturaController {
   anularFactura(
     @Param('id') id: string,
     @Body() anularFacturaDto: AnularFacturaDto,
+    @Actor() actor: ActorAuditoria,
   ) {
-    return this.facturaService.anularFactura(+id, anularFacturaDto);
+    return this.facturaService.anularFactura(+id, anularFacturaDto, actor);
   }
 
   @Patch(':id/discount')

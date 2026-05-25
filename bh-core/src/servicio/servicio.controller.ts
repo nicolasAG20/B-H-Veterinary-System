@@ -7,6 +7,8 @@ import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { RolesGuard } from '../auth/guards/roles.guard';
 import { Roles } from '../auth/decorators/roles.decorator';
 import { RolUsuario } from '../usuario/entities/usuario.entity';
+import { Actor } from '../audit/actor.decorator';
+import { ActorAuditoria } from '../audit/audit.types';
 
 @Controller('servicios')
 export class ServicioController {
@@ -15,8 +17,11 @@ export class ServicioController {
   @Post()
   @UseGuards(JwtAuthGuard, RolesGuard)
   @Roles(RolUsuario.ADMINISTRADOR)
-  create(@Body() createServicioDto: CreateServicioDto) {
-    return this.servicioService.create(createServicioDto);
+  create(
+    @Body() createServicioDto: CreateServicioDto,
+    @Actor() actor: ActorAuditoria,
+  ) {
+    return this.servicioService.create(createServicioDto, actor);
   }
 
   @Get()
@@ -37,14 +42,18 @@ export class ServicioController {
   update(
     @Param('serviceId', ParseIntPipe) serviceId: number,
     @Body() updateServicioDto: UpdateServicioDto,
+    @Actor() actor: ActorAuditoria,
   ) {
-    return this.servicioService.update(serviceId, updateServicioDto);
+    return this.servicioService.update(serviceId, updateServicioDto, actor);
   }
 
   @Patch(':serviceId/deactivate')
   @UseGuards(JwtAuthGuard, RolesGuard)
   @Roles(RolUsuario.ADMINISTRADOR)
-  deactivate(@Param('serviceId', ParseIntPipe) serviceId: number) {
-    return this.servicioService.deactivate(serviceId);
+  deactivate(
+    @Param('serviceId', ParseIntPipe) serviceId: number,
+    @Actor() actor: ActorAuditoria,
+  ) {
+    return this.servicioService.deactivate(serviceId, actor);
   }
 }

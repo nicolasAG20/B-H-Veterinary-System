@@ -1,16 +1,24 @@
-import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
+import { BadRequestException, Inject, Injectable, NotFoundException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Like, Repository } from 'typeorm';
 import { Producto } from './entities/producto.entity';
 import { CreateProductoDto } from './dto/create-producto.dto';
 import { UpdateProductoDto } from './dto/update-producto.dto';
 import { AjustarStockDto } from './dto/ajustar-stock.dto';
+import {
+  ActorAuditoria,
+  AUDIT_CLIENT,
+  IAuditClient,
+  TipoAccion,
+} from '../audit/audit.types';
 
 @Injectable()
 export class ProductoService {
   constructor(
     @InjectRepository(Producto)
     private readonly productoRepository: Repository<Producto>,
+    @Inject(AUDIT_CLIENT)
+    private readonly auditClient: IAuditClient,
   ) {}
 
   async create(createProductoDto: CreateProductoDto): Promise<Producto> {
@@ -70,7 +78,11 @@ export class ProductoService {
   }
 
 
-  async adjustStock(id: number, ajustarStockDto: AjustarStockDto): Promise<Producto> {
+  async adjustStock(
+    id: number,
+    ajustarStockDto: AjustarStockDto,
+    actor: ActorAuditoria,
+  ): Promise<Producto> {
     const producto = await this.findOne(id);
     const nuevoStock = producto.stock + ajustarStockDto.cantidad;
 
@@ -79,8 +91,18 @@ export class ProductoService {
     }
 
     producto.stock = nuevoStock;
-    return this.productoRepository.save(producto);
-  } 
+    const productoActualizado = await this.productoRepository.save(producto);
+
+    await this.auditClient.registrar({
+      tipo_accion: TipoAccion.AJUSTE_INVENTARIO,
+      usuarioId: actor.id,
+      nombre_usuario: actor.nombre,
+      rol: actor.rol,
+      fecha_hora: new Date().toISOString(),
+    });
+
+    return productoActualizado;
+  }
 
     async findLowStock(): Promise<Producto[]> {
     return this.productoRepository
