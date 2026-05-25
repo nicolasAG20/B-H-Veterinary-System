@@ -1,15 +1,17 @@
-import { BadRequestException, ConflictException, Injectable, NotFoundException } from '@nestjs/common';
+import { BadRequestException, ConflictException, Inject, Injectable, NotFoundException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { In, Repository, Between , LessThanOrEqual} from 'typeorm';
-import { Factura } from 'src/factura/entities/factura.entity'; 
+import { Factura } from 'src/factura/entities/factura.entity';
 import { Cita, EstadoCita } from '../cita/entities/cita.entity';
 import { Producto } from '../producto/entities/producto.entity';
 import { Cliente } from '../cliente/entities/cliente.entity';
 import { pdfCitaDto } from './dto/pdf-cita.dto';
 import { PdfFacturaDto } from './dto/pdf-factura.dto';
+import { PdfHistorialAccionesDto } from './dto/pdf-historial-acciones.dto';
 import { resolve } from 'path';
 import { timeout } from 'rxjs';
 import { Vacunacion } from 'src/vacunacion/entities/vacunacion.entity';
+import { AUDIT_CLIENT, IAuditClient } from '../audit/audit.types';
 
 const PDFDocument = require('pdfkit-table');
 
@@ -24,7 +26,112 @@ export class PdfService {
     private readonly productoRepository: Repository<Producto>,
     @InjectRepository(Cliente)
     private readonly clienteRepository: Repository<Cliente>,
+    @Inject(AUDIT_CLIENT)
+    private readonly auditClient: IAuditClient,
   ) {}
+
+  /**
+   * Genera el reporte PDF del historial de acciones consultando bh-audit
+   * con los filtros indicados.
+   *
+   * @param dto filtros opcionales (tipo de acción, usuario, rol, rango de fechas).
+   * @returns buffer del PDF listo para ser enviado al cliente.
+   * @throws BadRequestException si la fecha de inicio es posterior a la final.
+   * @throws NotFoundException si no existen eventos que cumplan los filtros.
+   */
+  async generarPDFHistorialAcciones(
+    dto: PdfHistorialAccionesDto,
+  ): Promise<Buffer> {
+    if (
+      dto.fechaInicio &&
+      dto.fechaFin &&
+      new Date(dto.fechaInicio) > new Date(dto.fechaFin)
+    ) {
+      throw new BadRequestException(
+        'La fecha de inicio es mayor a la fecha final',
+      );
+    }
+
+    const eventos = await this.auditClient.consultarEventos({
+      tipo_accion: dto.tipo_accion,
+      usuarioId: dto.usuarioId,
+      rol: dto.rol,
+      fechaInicio: dto.fechaInicio,
+      fechaFin: dto.fechaFin,
+    });
+
+    if (!eventos.length) {
+      throw new NotFoundException(
+        'No existen eventos de auditoría con los filtros indicados',
+      );
+    }
+
+    const pdfBuffer: Buffer = await new Promise((resolve) => {
+      const doc = new PDFDocument({
+        size: 'LETTER',
+        bufferPages: true,
+        autoFirstPage: false,
+      });
+
+      doc.addPage();
+      doc.fontSize(24);
+      doc.text('BH Veterinaria', { align: 'center' });
+      doc.fontSize(14);
+      doc.text('Reporte historial de acciones', { align: 'center' });
+      doc.fontSize(10);
+      doc.moveDown();
+
+      doc.fontSize(11);
+      doc.text(`Total de acciones: ${eventos.length}`);
+      doc.text(`Tipo de acción: ${dto.tipo_accion ?? 'Todos'}`);
+      doc.text(`Rol: ${dto.rol ?? 'Todos'}`);
+      doc.text(`Usuario: ${dto.usuarioId ?? 'Todos'}`);
+      doc.text(`Fecha inicio: ${dto.fechaInicio ?? 'Sin filtro'}`);
+      doc.text(`Fecha fin: ${dto.fechaFin ?? 'Sin filtro'}`);
+      doc.moveDown();
+
+      const filas = eventos.map((evento) => [
+        evento.id,
+        evento.tipo_accion,
+        evento.nombre_usuario,
+        evento.rol,
+        new Date(evento.fecha_hora).toLocaleString('es-CO'),
+      ]);
+
+      const tabla = {
+        title: 'Acciones registradas:',
+        headers: ['ID', 'Tipo de acción', 'Usuario', 'Rol', 'Fecha y hora'],
+        rows: filas,
+        options: {
+          divider: {
+            horizontal: { disabled: true, with: 0.5, opacity: 0.5 },
+          },
+        },
+      };
+
+      doc.font('Helvetica');
+      doc.moveDown();
+      doc.table(tabla, {
+        columnSize: [50, 150, 130, 90, 160],
+        padding: 6,
+        prepareRow: () => {
+          doc.font('Helvetica').fontSize(9);
+        },
+      });
+
+      doc.moveDown();
+
+      const buffer: Buffer[] = [];
+      doc.on('data', buffer.push.bind(buffer));
+      doc.on('end', () => {
+        const data = Buffer.concat(buffer);
+        resolve(data);
+      });
+      doc.end();
+    });
+
+    return pdfBuffer;
+  }
 
 
   async generarPDFFactura(dto: PdfFacturaDto): Promise<Buffer>{

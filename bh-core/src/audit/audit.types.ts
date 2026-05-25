@@ -56,6 +56,32 @@ export interface IEventoAuditoria {
 }
 
 /**
+ * Filtros opcionales aceptados al consultar el historial de eventos.
+ * Cualquier campo ausente o vacío se ignora.
+ */
+export interface FiltrosConsultaEventos {
+  tipo_accion?: TipoAccion;
+  usuarioId?: number;
+  rol?: RolAuditoria;
+  /** Fecha inicial inclusive en formato ISO `YYYY-MM-DD`. */
+  fechaInicio?: string;
+  /** Fecha final inclusive en formato ISO `YYYY-MM-DD`. */
+  fechaFin?: string;
+}
+
+/**
+ * Forma en que bh-audit retorna cada evento al ser consultado.
+ */
+export interface EventoAuditoriaConsulta {
+  id: number;
+  tipo_accion: TipoAccion;
+  usuarioId: number;
+  nombre_usuario: string;
+  rol: RolAuditoria;
+  fecha_hora: string;
+}
+
+/**
  * Contrato del cliente de auditoría.
  *
  * Permite que los servicios de bh-core dependan de una abstracción y no
@@ -68,6 +94,16 @@ export interface IAuditClient {
    * registran internamente para no interrumpir la operación de negocio.
    */
   registrar(evento: IEventoAuditoria): Promise<void>;
+
+  /**
+   * Consulta el historial de eventos aplicando los filtros indicados.
+   * A diferencia de {@link registrar}, esta operación sí propaga las
+   * excepciones para que el consumidor (ej. generador de PDF) pueda
+   * reaccionar correctamente cuando bh-audit no esté disponible.
+   */
+  consultarEventos(
+    filtros: FiltrosConsultaEventos,
+  ): Promise<EventoAuditoriaConsulta[]>;
 }
 
 /**

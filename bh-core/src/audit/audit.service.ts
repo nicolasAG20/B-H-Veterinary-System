@@ -2,7 +2,12 @@ import { HttpService } from '@nestjs/axios';
 import { Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { firstValueFrom } from 'rxjs';
-import { IAuditClient, IEventoAuditoria } from './audit.types';
+import {
+  EventoAuditoriaConsulta,
+  FiltrosConsultaEventos,
+  IAuditClient,
+  IEventoAuditoria,
+} from './audit.types';
 
 /**
  * Implementación HTTP del cliente de auditoría.
@@ -42,5 +47,38 @@ export class HttpAuditClient implements IAuditClient {
         `No se pudo registrar el evento ${evento.tipo_accion} en bh-audit: ${detalle}`,
       );
     }
+  }
+
+  /**
+   * Consulta a bh-audit los eventos que cumplen los filtros indicados.
+   * Construye los query params únicamente con los filtros presentes y
+   * deja propagar cualquier error de red o HTTP al consumidor.
+   */
+  async consultarEventos(
+    filtros: FiltrosConsultaEventos,
+  ): Promise<EventoAuditoriaConsulta[]> {
+    const params = this.construirParams(filtros);
+    const response = await firstValueFrom(
+      this.httpService.get<EventoAuditoriaConsulta[]>(this.endpoint, { params }),
+    );
+    return response.data ?? [];
+  }
+
+  /**
+   * Convierte los filtros de consulta en un objeto de query params plano,
+   * descartando los campos cuyo valor sea `undefined`.
+   */
+  private construirParams(
+    filtros: FiltrosConsultaEventos,
+  ): Record<string, string> {
+    const params: Record<string, string> = {};
+    if (filtros.tipo_accion) params.tipo_accion = filtros.tipo_accion;
+    if (filtros.usuarioId !== undefined) {
+      params.usuarioId = String(filtros.usuarioId);
+    }
+    if (filtros.rol) params.rol = filtros.rol;
+    if (filtros.fechaInicio) params.fechaInicio = filtros.fechaInicio;
+    if (filtros.fechaFin) params.fechaFin = filtros.fechaFin;
+    return params;
   }
 }
