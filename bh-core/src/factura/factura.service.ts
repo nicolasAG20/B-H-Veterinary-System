@@ -1,6 +1,6 @@
 import { BadRequestException, ConflictException, Injectable, NotFoundException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { In, Repository } from 'typeorm';
+import { In, Repository, Between } from 'typeorm';
 import { Factura, EstadoFactura } from './entities/factura.entity';
 import { Cita, EstadoCita } from '../cita/entities/cita.entity';
 import { Producto } from '../producto/entities/producto.entity';
@@ -10,6 +10,7 @@ import { UpdateFacturaDto } from './dto/update-factura.dto';
 import { GenerarFacturaDto } from './dto/generar-factura.dto';
 import { AplicarDescuentoDto } from './dto/aplicar-descuento.dto';
 import { AnularFacturaDto } from './dto/anular-factura.dto';
+import { PdfFacturaDto } from './dto/pdf-factura.dto';
 import { resolve } from 'path';
 import { timeout } from 'rxjs';
 
@@ -362,10 +363,6 @@ export class FacturaService {
         });
         doc.moveDown();
       
-
-
-
-
         const buffer = []
         doc.on('data', buffer.push.bind(buffer))
         doc.on('end', () => {
@@ -379,6 +376,100 @@ export class FacturaService {
       return pdfBuffer;
 
     }
+
+
+    async generarPDFporPeriodo(dto: PdfFacturaDto): Promise<Buffer>{
+
+          const { fecha_inicio , fecha_fin  } = dto;
+          if(new Date(fecha_inicio)> new Date(fecha_fin)){
+            throw new BadRequestException(`la fecha de inicio es mayor a la del final`);
+          }
+          const facturas = await this.facturaRepository.find({
+          where: { 
+          fecha_creacion: Between(new Date(fecha_inicio), new Date(fecha_fin)) 
+        },  
+          relations: [
+            'cita',
+          ],
+        });
+          
+    
+        if (!facturas.length) {
+          throw new NotFoundException(`no existen facturas en ese rango de fechas`);
+        }
+        
+          const pdfBuffer: Buffer = await new Promise( resolve => {
+            const doc = new PDFDocument(
+              {
+                size: "LETTER" , 
+                bufferPages: true ,
+                autoFirstPage : false
+              }
+            )
+            doc.addPage(); 
+            doc.fontSize(24);
+            doc.text("BH Veterinaria" ,{
+              align: 'center'
+            }); 
+            doc.fontSize(14);
+            doc.text("Reporte facturas " ,{
+              align: 'center'
+            }); 
+            doc.fontSize(10);
+            doc.moveDown();
+       
+            const row_facturas= []; 
+            let sumaTotal = 0;
+            
+            facturas.forEach(element => {
+              sumaTotal += element.total ?? 0;
+              const temp_list = [element.idFactura , element.descuento , element.estado];
+              row_facturas.push(temp_list);
+            })
+    
+            const table = {
+              title: "Facturas:",
+              headers:['Id','Descuento', 'Estado'],
+              rows: row_facturas,
+              options: {
+                divider:{
+                  horizontal:{disabled: true , with: 0.5 , opacity : 0.5}
+                }
+              }
+    
+            }
+            doc.font('Helvetica');
+            doc.moveDown();
+            doc.moveDown();
+            doc.fontSize(12);
+            doc.text(`Total facturas: ${facturas.length}`); 
+            doc.text(`Total facturado: ${sumaTotal}`); 
+             
+            doc.table(table,{
+              columnSize:[200,300,150],
+              prepareRow: (row, indexColumn, indexRow, rectRow, rectCell) => {
+              doc.font('Helvetica').fontSize(15);
+              },
+            })
+    
+            doc.moveDown();
+            doc.font('Helvetica').fontSize(12);
+          
+            
+            doc.moveDown();
+            const buffer = []
+            doc.on('data', buffer.push.bind(buffer))
+            doc.on('end', () => {
+                const data = Buffer.concat(buffer)
+                resolve(data)
+            })
+            doc.end()
+    
+          })
+    
+          return pdfBuffer;
+    
+        }
   // ─────────────────────────────────────────────
   // Métodos privados
   // ─────────────────────────────────────────────

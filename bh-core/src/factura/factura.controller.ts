@@ -9,6 +9,7 @@ import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { RolesGuard } from '../auth/guards/roles.guard';
 import { Roles } from '../auth/decorators/roles.decorator';
 import { RolUsuario } from '../usuario/entities/usuario.entity';
+import { PdfFacturaDto } from './dto/pdf-factura.dto';
 
 @UseGuards(JwtAuthGuard)
 @Controller('invoices')
@@ -75,6 +76,20 @@ export class FacturaController {
     res.end(buffer);
   }
 
+  @Post('pdf/rango')
+  @UseGuards(RolesGuard)
+  @Roles(RolUsuario.ADMINISTRADOR)
+  async downloadPDFRange(@Res() res , @Body() pdfFacturaDto :PdfFacturaDto): Promise<void>{
+    
+    const buffer = await this.facturaService.generarPDFporPeriodo(pdfFacturaDto);
+    res.set({
+      'Content-Type' : 'application/pdf',
+      'Content-Disposition' : 'attachment; filename=factura.pdf',
+      'Content-Length' : buffer.length, 
+    })
+  
+    res.end(buffer);
+  }
 
 
 }

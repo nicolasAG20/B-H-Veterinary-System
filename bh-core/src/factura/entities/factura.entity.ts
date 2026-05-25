@@ -1,5 +1,6 @@
-import { Column, Entity, JoinColumn, ManyToOne, PrimaryGeneratedColumn } from 'typeorm';
+import { Column, Entity, JoinColumn, ManyToOne, PrimaryGeneratedColumn, Timestamp } from 'typeorm';
 import { Cita } from '../../cita/entities/cita.entity';
+import { timestamp } from 'rxjs';
 
 export enum EstadoFactura {
   PENDIENTE = 'PENDIENTE',
@@ -29,6 +30,9 @@ export class Factura {
 
   @Column({ type: 'longtext', nullable: true })
   motivo_anulacion: string;
+
+  @Column({type: 'timestamp', nullable: false})
+  fecha_creacion : Timestamp;
 
   @ManyToOne(() => Cita, (cita) => cita.facturas)
   @JoinColumn({ name: 'Cita_id' })

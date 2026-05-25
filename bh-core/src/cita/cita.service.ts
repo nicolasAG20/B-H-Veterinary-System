@@ -427,7 +427,7 @@ export class CitaService {
     });
       
 
-    if (!citas) {
+    if (!citas.length) {
       throw new NotFoundException(`no existen citas en ese rango de fechas`);
     }
     
