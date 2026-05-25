@@ -1,4 +1,4 @@
-import { Controller, Get, Post, Body, Patch, Param, Delete, UseGuards ,Res} from '@nestjs/common';
+import { Controller, Get, Post, Body, Patch, Param, Delete, UseGuards ,Res, ParseIntPipe } from '@nestjs/common';
 import { Response } from 'express';
 import { FacturaService } from './factura.service';
 import { CreateFacturaDto } from './dto/create-factura.dto';
@@ -61,6 +61,7 @@ export class FacturaController {
   }
 
   @Get(':id/pdf')
+  @Roles(RolUsuario.CLIENTE , RolUsuario.ADMINISTRADOR)
   async downloadPDF(@Res() res ,@Param('id') id: string): Promise<void>{
     
     const buffer = await this.facturaService.generarPDF(+id);

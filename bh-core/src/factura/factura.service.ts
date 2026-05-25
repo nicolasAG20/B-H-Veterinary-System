@@ -263,19 +263,21 @@ export class FacturaService {
         'cita.servicios',
         'cita.usuario',
         'cita.mascota',
+        'cita.mascota.cliente', 
         'cita.historiales',
         'cita.historiales.medicamentos',
         'cita.historiales.medicamentos.producto',
+        'cita.mascota.cliente.usuario',
       ],
     });
       
-
+    
     if (!factura) {
       throw new NotFoundException(`Factura #${id} no encontrada`);
     }
     const cita = factura.cita ; 
     const usuario = cita.usuario;
-
+    const clienteNombre = cita.mascota.cliente.usuario.nombre; 
     const servicios = cita.servicios; 
       const pdfBuffer: Buffer = await new Promise( resolve => {
         const doc = new PDFDocument(
@@ -303,7 +305,7 @@ export class FacturaService {
         
         doc.moveDown();
         doc.fontSize(12);
-        doc.text(`Cliente: ${usuario.nombre}`,{
+        doc.text(`Cliente: ${clienteNombre}`,{
           align: 'center'
         });
         doc.text(`Mascota: ${cita.mascota.nombre}`,{

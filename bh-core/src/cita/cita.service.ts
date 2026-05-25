@@ -6,7 +6,7 @@ import {
 } from '@nestjs/common';
 
 import { InjectRepository } from '@nestjs/typeorm';
-import { In, Repository } from 'typeorm';
+import { In, Repository, Between } from 'typeorm';
 
 import { Cita, EstadoCita } from './entities/cita.entity';
 import { Servicio } from '../servicio/entities/servicio.entity';
@@ -18,6 +18,7 @@ import { CreateCitaDto } from './dto/create-cita.dto';
 import { CancelarCitaDto } from './dto/cancelar-cita.dto';
 import { UpdateCitaDto } from './dto/update-cita.dto';
 import { EstimateCitaDto } from './dto/estimate-cita.dto';
+import { pdfCitaDto } from './dto/pdf-cita.dto';
 
 import {
   DetalleServicio,
@@ -25,7 +26,7 @@ import {
 } from './interfaces/estimate-cita.interface';
 import { IResultadoVerificacionPago } from './interfaces/pago.interface';
 
-
+const PDFDocument = require('pdfkit-table');
 /**
  * Servicio de gestión de citas veterinarias.
  *
@@ -396,4 +397,117 @@ export class CitaService {
       cita,
     };
   }
+   /**
+   * Valida y retorna los servicios correspondientes a los IDs proporcionados.
+   *
+   * @param dto , Trae la fecha de inicio y final del rango seleccionado 
+   * @returns PDF con las citas que entran en el rango de fechas
+   * @throws BadRequestException si la fecha de inicio es mayor a la fecha final del rango
+   * @throws NotFoundException si no existen citas en ese rango
+   */
+   async generarPDF(dto: pdfCitaDto): Promise<Buffer>{
+      const { fecha_inicio , fecha_fin  } = dto;
+      if(new Date(fecha_inicio)> new Date(fecha_fin)){
+        throw new BadRequestException(`la fecha de inicio es mayor a la del final`);
+      }
+      const citas = await this.citaRepository.find({
+      where: { 
+      fecha_hora: Between(new Date(fecha_inicio), new Date(fecha_fin)) 
+    },  
+      relations: [
+        'servicios',
+        'usuario',
+        'mascota',
+        'mascota.cliente',         
+        'mascota.cliente.usuario',
+        'historiales',
+        'historiales.medicamentos',
+        'historiales.medicamentos.producto',
+      ],
+    });
+      
+
+    if (!citas) {
+      throw new NotFoundException(`no existen citas en ese rango de fechas`);
+    }
+    
+      const pdfBuffer: Buffer = await new Promise( resolve => {
+        const doc = new PDFDocument(
+          {
+            size: "LETTER" , 
+            bufferPages: true ,
+            autoFirstPage : false
+          }
+        )
+        doc.addPage(); 
+        doc.fontSize(24);
+        doc.text("BH Veterinaria" ,{
+          align: 'center'
+        }); 
+        doc.fontSize(14);
+        doc.text("Reporte citas " ,{
+          align: 'center'
+        }); 
+        doc.fontSize(10);
+         doc.moveDown();
+        
+        
+        doc.moveDown();
+        doc.fontSize(12);
+        
+
+       
+        const row_citas= []; 
+        citas.forEach(element => {
+          const clienteNombre = element.mascota.cliente.usuario.nombre;
+          const nombreMascota = element.mascota.nombre;
+          const nombreVeterinario =element.usuario.nombre;
+          const temp_list = [clienteNombre , nombreMascota , nombreVeterinario , element.estado];
+          row_citas.push(temp_list);
+        })
+
+        const table = {
+          title: "citas:",
+          headers:['Cliente','Mascota', 'nombreVeterinario', 'estado'],
+          rows: row_citas,
+          options: {
+            divider:{
+              horizontal:{disabled: true , with: 0.5 , opacity : 0.5}
+            }
+          }
+
+        }
+        doc.font('Helvetica');
+        doc.moveDown();
+        doc.moveDown();
+        doc.table(table,{
+          columnSize:[200,300,150],
+          prepareRow: (row, indexColumn, indexRow, rectRow, rectCell) => {
+          doc.font('Helvetica').fontSize(15);
+          },
+        })
+
+        doc.moveDown();
+        doc.font('Helvetica').fontSize(12);
+       /* doc.text(`Sub total: $${factura.subtotal ?? 0}`,{
+          align: 'center'
+        });*/
+        
+        doc.moveDown();
+      
+
+        const buffer = []
+        doc.on('data', buffer.push.bind(buffer))
+        doc.on('end', () => {
+            const data = Buffer.concat(buffer)
+            resolve(data)
+        })
+        doc.end()
+
+      })
+
+      return pdfBuffer;
+
+    }
+
 }
