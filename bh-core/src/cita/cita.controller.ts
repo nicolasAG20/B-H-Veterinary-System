@@ -21,7 +21,7 @@ import { Roles } from '../auth/decorators/roles.decorator';
 import { RolUsuario } from '../usuario/entities/usuario.entity';
 import { FacturaService } from '../factura/factura.service';
 import { GenerarFacturaDto } from '../factura/dto/generar-factura.dto';
-import { pdfCitaDto } from './dto/pdf-cita.dto';
+
 
 /**
  * Controlador para la gestión de citas veterinarias.
@@ -135,18 +135,5 @@ export class CitaController {
     return this.citaService.remove(+id);
   }
 
-  @Post('pdfCitas')
-  @UseGuards(RolesGuard)
-  @Roles(RolUsuario.ADMINISTRADOR)
-    async downloadPDF(@Res() res ,@Body() pdfCitaDto: pdfCitaDto): Promise<void>{
-      
-      const buffer = await this.citaService.generarPDF(pdfCitaDto);
-      res.set({
-        'Content-Type' : 'application/pdf',
-        'Content-Disposition' : 'attachment; filename=factura.pdf',
-        'Content-Length' : buffer.length, 
-      })
-    
-      res.end(buffer);
-    }
+  
 }
