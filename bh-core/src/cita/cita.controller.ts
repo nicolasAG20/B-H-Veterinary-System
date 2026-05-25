@@ -21,6 +21,8 @@ import { Roles } from '../auth/decorators/roles.decorator';
 import { RolUsuario } from '../usuario/entities/usuario.entity';
 import { FacturaService } from '../factura/factura.service';
 import { GenerarFacturaDto } from '../factura/dto/generar-factura.dto';
+import { Actor } from '../audit/actor.decorator';
+import { ActorAuditoria } from '../audit/audit.types';
 
 
 /**
@@ -61,8 +63,8 @@ export class CitaController {
    * @returns Mensaje de confirmación y la cita creada.
    */
   @Post()
-  create(@Body() createCitaDto: CreateCitaDto) {
-    return this.citaService.create(createCitaDto);
+  create(@Body() createCitaDto: CreateCitaDto, @Actor() actor: ActorAuditoria) {
+    return this.citaService.create(createCitaDto, actor);
   }
 
   /**
@@ -102,8 +104,9 @@ export class CitaController {
   cancelar(
     @Param('id') id: string,
     @Body() cancelarCitaDto: CancelarCitaDto,
+    @Actor() actor: ActorAuditoria,
   ) {
-    return this.citaService.cancelar(+id, cancelarCitaDto);
+    return this.citaService.cancelar(+id, cancelarCitaDto, actor);
   }
 
   /**
@@ -120,8 +123,9 @@ export class CitaController {
   generarFactura(
     @Param('id') id: string,
     @Body() generarFacturaDto: GenerarFacturaDto,
+    @Actor() actor: ActorAuditoria,
   ) {
-    return this.facturaService.generarFactura(+id, generarFacturaDto);
+    return this.facturaService.generarFactura(+id, generarFacturaDto, actor);
   }
 
   /**

@@ -1,6 +1,7 @@
 import {
   BadRequestException,
   ConflictException,
+  Inject,
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
@@ -12,6 +13,13 @@ import { CreateUsuarioDto, RegistroUsuarioDto } from './dto/create-usuario.dto';
 import { UpdateUsuarioDto } from './dto/update-usuario.dto';
 import { VerificarCorreoDto } from './dto/verificar-correo.dto';
 import { MailService } from '../mail/mail.service';
+import {
+  ActorAuditoria,
+  AUDIT_CLIENT,
+  IAuditClient,
+  RolAuditoria,
+  TipoAccion,
+} from '../audit/audit.types';
 
 @Injectable()
 export class UsuarioService {
@@ -19,6 +27,8 @@ export class UsuarioService {
     @InjectRepository(Usuario)
     private readonly usuarioRepository: Repository<Usuario>,
     private readonly mailService: MailService,
+    @Inject(AUDIT_CLIENT)
+    private readonly auditClient: IAuditClient,
   ) {}
 
   /**
@@ -52,8 +62,16 @@ export class UsuarioService {
       tiempo_expiracion: expiracion,
     });
 
-    await this.usuarioRepository.save(usuario);
+    const usuarioGuardado = await this.usuarioRepository.save(usuario);
     await this.mailService.enviarCodigoVerificacion(dto.correo, codigo);
+
+    await this.auditClient.registrar({
+      tipo_accion: TipoAccion.REGISTRO_USUARIO,
+      usuarioId: usuarioGuardado.id,
+      nombre_usuario: usuarioGuardado.nombre,
+      rol: usuarioGuardado.rol as unknown as RolAuditoria,
+      fecha_hora: new Date().toISOString(),
+    });
 
     return {
       mensaje: 'Usuario registrado exitosamente. Se ha enviado un código de verificación al correo.',
@@ -98,21 +116,31 @@ export class UsuarioService {
       tiempo_expiracion: null,
     });
 
+    await this.auditClient.registrar({
+      tipo_accion: TipoAccion.VERIFICACION_CORREO,
+      usuarioId: usuario.id,
+      nombre_usuario: usuario.nombre,
+      rol: usuario.rol as unknown as RolAuditoria,
+      fecha_hora: new Date().toISOString(),
+    });
+
     return { mensaje: 'Operación realizada exitosamente.' };
   }
 
   /**
    * Aprueba la cuenta de un VETERINARIO o RECEPCIONISTA que ya verificó su correo.
    * Solo es posible si el usuario está en estado PENDIENTE_APROBACION.
+   * El actor que realiza la aprobación se identifica con los datos enviados desde el controller.
    * @throws {NotFoundException} Si el usuario no existe.
    * @throws {ConflictException} Si la cuenta no está en estado PENDIENTE_APROBACION.
    */
-  async aprobar(id: number) {
+  async aprobar(id: number, actor: ActorAuditoria) {
     const usuario = await this.findOne(id);
     if (usuario.estado !== EstadoUsuario.PENDIENTE_APROBACION) {
       throw new ConflictException('La cuenta no está en estado PENDIENTE_APROBACION');
     }
     await this.usuarioRepository.update(id, { estado: EstadoUsuario.ACTIVO });
+    await this.registrarEventoAdmin(TipoAccion.APROBACION_CUENTA, actor);
     return { mensaje: 'Operación realizada exitosamente.' };
   }
 
@@ -120,9 +148,10 @@ export class UsuarioService {
    * Rechaza la cuenta de un usuario, impidiendo su acceso al sistema.
    * @throws {NotFoundException} Si el usuario no existe.
    */
-  async rechazar(id: number) {
+  async rechazar(id: number, actor: ActorAuditoria) {
     await this.findOne(id);
     await this.usuarioRepository.update(id, { estado: EstadoUsuario.RECHAZADO });
+    await this.registrarEventoAdmin(TipoAccion.RECHAZO_CUENTA, actor);
     return { mensaje: 'Operación realizada exitosamente.' };
   }
 
@@ -130,10 +159,28 @@ export class UsuarioService {
    * Suspende la cuenta de un usuario activo, bloqueando su acceso temporalmente.
    * @throws {NotFoundException} Si el usuario no existe.
    */
-  async suspender(id: number) {
+  async suspender(id: number, actor: ActorAuditoria) {
     await this.findOne(id);
     await this.usuarioRepository.update(id, { estado: EstadoUsuario.SUSPENDIDO });
+    await this.registrarEventoAdmin(TipoAccion.SUSPENSION_USUARIO, actor);
     return { mensaje: 'Operación realizada exitosamente.' };
+  }
+
+  /**
+   * Notifica a bh-audit un evento administrativo identificando como actor al
+   * usuario autenticado que originó la operación.
+   */
+  private async registrarEventoAdmin(
+    tipoAccion: TipoAccion,
+    actor: ActorAuditoria,
+  ): Promise<void> {
+    await this.auditClient.registrar({
+      tipo_accion: tipoAccion,
+      usuarioId: actor.id,
+      nombre_usuario: actor.nombre,
+      rol: actor.rol,
+      fecha_hora: new Date().toISOString(),
+    });
   }
 
   async create(createUsuarioDto: CreateUsuarioDto) {

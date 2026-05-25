@@ -14,6 +14,8 @@ import { CreateHospitalizacionDto } from './dto/create-hospitalizacion.dto';
 import { UpdateHospitalizacionDto } from './dto/update-hospitalizacion.dto';
 import { DarAltaDto } from './dto/dar-alta.dto';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
+import { Actor } from '../audit/actor.decorator';
+import { ActorAuditoria } from '../audit/audit.types';
 
 /**
  * Controlador para la gestión de hospitalizaciones veterinarias.
@@ -36,8 +38,8 @@ export class HospitalizacionController {
    * @returns Mensaje de confirmación y el registro de hospitalización creado.
    */
   @Post()
-  create(@Body() dto: CreateHospitalizacionDto) {
-    return this.hospitalizacionService.create(dto);
+  create(@Body() dto: CreateHospitalizacionDto, @Actor() actor: ActorAuditoria) {
+    return this.hospitalizacionService.create(dto, actor);
   }
 
   /**
@@ -76,8 +78,12 @@ export class HospitalizacionController {
    * @returns Mensaje de confirmación y la hospitalización actualizada.
    */
   @Patch(':id/discharge')
-  discharge(@Param('id') id: string, @Body() dto: DarAltaDto) {
-    return this.hospitalizacionService.discharge(+id, dto);
+  discharge(
+    @Param('id') id: string,
+    @Body() dto: DarAltaDto,
+    @Actor() actor: ActorAuditoria,
+  ) {
+    return this.hospitalizacionService.discharge(+id, dto, actor);
   }
 
   /**

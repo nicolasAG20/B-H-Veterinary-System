@@ -16,6 +16,8 @@ import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { RolesGuard } from '../auth/guards/roles.guard';
 import { Roles } from '../auth/decorators/roles.decorator';
 import { RolUsuario } from './entities/usuario.entity';
+import { Actor } from '../audit/actor.decorator';
+import { ActorAuditoria } from '../audit/audit.types';
 
 @Controller('users')
 export class UsuarioController {
@@ -53,21 +55,29 @@ export class UsuarioController {
   @Patch(':userId/approve')
   @UseGuards(JwtAuthGuard, RolesGuard)
   @Roles(RolUsuario.ADMINISTRADOR)
-  aprobar(@Param('userId') userId: string) {
-    return this.usuarioService.aprobar(+userId);
+  aprobar(@Param('userId') userId: string, @Actor() actor: ActorAuditoria) {
+    return this.usuarioService.aprobar(+userId, actor);
   }
 
   @Patch(':userId/reject')
   @UseGuards(JwtAuthGuard, RolesGuard)
   @Roles(RolUsuario.ADMINISTRADOR)
-  rechazar(@Param('userId') userId: string, @Body() _dto: MotivoDto) {
-    return this.usuarioService.rechazar(+userId);
+  rechazar(
+    @Param('userId') userId: string,
+    @Body() _dto: MotivoDto,
+    @Actor() actor: ActorAuditoria,
+  ) {
+    return this.usuarioService.rechazar(+userId, actor);
   }
 
   @Patch(':userId/suspend')
   @UseGuards(JwtAuthGuard, RolesGuard)
   @Roles(RolUsuario.ADMINISTRADOR)
-  suspender(@Param('userId') userId: string, @Body() _dto: MotivoDto) {
-    return this.usuarioService.suspender(+userId);
+  suspender(
+    @Param('userId') userId: string,
+    @Body() _dto: MotivoDto,
+    @Actor() actor: ActorAuditoria,
+  ) {
+    return this.usuarioService.suspender(+userId, actor);
   }
 }

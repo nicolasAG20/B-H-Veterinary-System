@@ -1,4 +1,4 @@
-import { BadRequestException, ConflictException, Injectable, NotFoundException } from '@nestjs/common';
+import { BadRequestException, ConflictException, Inject, Injectable, NotFoundException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { In, Repository, Between } from 'typeorm';
 import { Factura, EstadoFactura } from './entities/factura.entity';
@@ -12,6 +12,12 @@ import { AplicarDescuentoDto } from './dto/aplicar-descuento.dto';
 import { AnularFacturaDto } from './dto/anular-factura.dto';
 import { resolve } from 'path';
 import { timeout } from 'rxjs';
+import {
+  ActorAuditoria,
+  AUDIT_CLIENT,
+  IAuditClient,
+  TipoAccion,
+} from '../audit/audit.types';
 
 const PDFDocument = require('pdfkit-table');
 
@@ -34,6 +40,8 @@ export class FacturaService {
     private readonly productoRepository: Repository<Producto>,
     @InjectRepository(Cliente)
     private readonly clienteRepository: Repository<Cliente>,
+    @Inject(AUDIT_CLIENT)
+    private readonly auditClient: IAuditClient,
   ) {}
 
   async create(createFacturaDto: CreateFacturaDto) {
@@ -92,7 +100,11 @@ export class FacturaService {
     return { message: 'Factura eliminada correctamente' };
   }
 
-  async generarFactura(citaId: number, dto: GenerarFacturaDto) {
+  async generarFactura(
+    citaId: number,
+    dto: GenerarFacturaDto,
+    actor: ActorAuditoria,
+  ) {
     const { descuento = 0, medicamentos_adicionales = [] } = dto;
 
     const cita = await this.citaRepository.findOne({
@@ -185,6 +197,8 @@ export class FacturaService {
       }),
     );
 
+    await this.registrarEvento(TipoAccion.CREACION_FACTURA, actor);
+
     return {
       idFactura: factura.idFactura,
       subtotal: factura.subtotal,
@@ -196,7 +210,11 @@ export class FacturaService {
     };
   }
 
-  async anularFactura(id: number, dto: AnularFacturaDto) {
+  async anularFactura(
+    id: number,
+    dto: AnularFacturaDto,
+    actor: ActorAuditoria,
+  ) {
     const factura = await this.facturaRepository.findOne({
       where: { idFactura: id },
     });
@@ -213,7 +231,27 @@ export class FacturaService {
     factura.motivo_anulacion = dto.motivo_anulacion;
 
     await this.facturaRepository.save(factura);
+
+    await this.registrarEvento(TipoAccion.ANULACION_FACTURA, actor);
+
     return { message: 'Factura anulada correctamente' };
+  }
+
+  /**
+   * Notifica a bh-audit un evento relacionado con facturación,
+   * identificando como actor a la recepcionista que originó la operación.
+   */
+  private async registrarEvento(
+    tipoAccion: TipoAccion,
+    actor: ActorAuditoria,
+  ): Promise<void> {
+    await this.auditClient.registrar({
+      tipo_accion: tipoAccion,
+      usuarioId: actor.id,
+      nombre_usuario: actor.nombre,
+      rol: actor.rol,
+      fecha_hora: new Date().toISOString(),
+    });
   }
 
   async aplicarDescuento(id: number, dto: AplicarDescuentoDto) {

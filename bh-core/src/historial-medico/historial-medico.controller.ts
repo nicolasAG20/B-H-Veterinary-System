@@ -18,6 +18,8 @@ import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { RolesGuard } from '../auth/guards/roles.guard';
 import { Roles } from '../auth/decorators/roles.decorator';
 import { RolUsuario } from '../usuario/entities/usuario.entity';
+import { Actor } from '../audit/actor.decorator';
+import { ActorAuditoria } from '../audit/audit.types';
 
 @UseGuards(JwtAuthGuard, RolesGuard)
 @Controller()
@@ -30,11 +32,13 @@ export class HistorialMedicoController {
     @Param('appointmentId') appointmentId: string,
     @Body() dto: CreateHistorialMedicoDto,
     @Req() req: any,
+    @Actor() actor: ActorAuditoria,
   ) {
     return this.historialMedicoService.createMedicalRecord(
       +appointmentId,
       req.user.sub,
       dto,
+      actor,
     );
   }
 
@@ -56,11 +60,13 @@ export class HistorialMedicoController {
     @Param('recordId') recordId: string,
     @Body() dto: UpdateHistorialMedicoDto,
     @Req() req: any,
+    @Actor() actor: ActorAuditoria,
   ) {
     return this.historialMedicoService.updateMedicalRecord(
       +recordId,
       req.user.sub,
       dto,
+      actor,
     );
   }
 }

@@ -16,11 +16,13 @@ import { NotaEvolucionModule } from './nota-evolucion/nota-evolucion.module';
 import { AuthModule } from './auth/auth.module';
 import { ReembolsoModule } from './reembolso/reembolso.module';
 import { PdfModule } from './pdf/pdf.module';
+import { AuditModule } from './audit/audit.module';
 
 
 @Module({
   imports: [
     ConfigModule.forRoot({ isGlobal: true }),
+    AuditModule,
     TypeOrmModule.forRootAsync({
       imports: [ConfigModule],
       useFactory: (configService: ConfigService) => ({
