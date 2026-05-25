@@ -8,15 +8,11 @@ import {
   ValidateNested,
 } from 'class-validator';
 import { Type } from 'class-transformer';
-import { PagoDto } from './pago.dto';
+import { PagoDto } from '../../cita/dto/pago.dto';
 
 /**
- * DTO para el agendamiento de una nueva cita veterinaria.
+ * DTO para generar un pdf de las citas en un rango de fechas
  *
- * Contiene los datos requeridos para registrar una cita con pago obligatorio.
- * El sistema calcula el total automáticamente a partir de los servicios
- * seleccionados y verifica que el monto pagado sea suficiente antes de
- * confirmar el agendamiento.
  */
 export class pdfCitaDto {
   /**
